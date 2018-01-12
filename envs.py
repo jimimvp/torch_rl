@@ -31,7 +31,7 @@ class BitFlippingEnv(object):
 
     def reset(self):
         self.goal = np.random.choice([0,1], self.num_bits)
-        self.state = np.zeros(self.num_bits)
+        self.state = np.zeros(self.num_bits, dtype=np.uint8)
         self.done = False
 
     def get_observation(self):
