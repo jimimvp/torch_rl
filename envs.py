@@ -23,16 +23,15 @@ class BitFlippingEnv(object):
 
 
     def step(self, action):
+        if action < self.state.size:
+            self.state[action] ^= 1
         self.done = np.alltrue(self.state == self.goal)
-        if action > self.state.size-1:
-            return self.state, int(self.done), self.done, {}
-        self.state[action] ^= 1
-        return self.state, int(self.done), self.done, {}
 
+        return self.state, int(self.done), self.done, {}
 
     def reset(self):
         self.goal = np.random.choice([0,1], self.num_bits)
-        self.state = np.random.choice([0,1], self.num_bits)
+        self.state = np.zeros(self.num_bits)
         self.done = False
 
     def get_observation(self):
