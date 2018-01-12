@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from envs import BitFlippingEnv
 from utils import to_tensor
-
+from models import PolicyAHG
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -26,45 +26,28 @@ def to_numpy(out):
     return out.data.numpy()
 
 
+"""
+    Implementation of the hindsight policy gradients.
 
-class Policy(nn.Module):
-
-    def __init__(self, obs_size, act_size):
-        super(Policy, self).__init__()
-
-        self.f1 = nn.Linear(obs_size*2,64)
-        self.f2 = nn.Linear(64, 32)
-        self.f3 = nn.Linear(32, act_size+1)
-
-        self.relu = nn.ReLU()
-        self.tanh = nn.Tanh()
-        self.softmax = nn.Softmax()
-
-
-    def forward(self, x):
-
-        out = self.f1(x)
-        out = self.relu(out)
-        out = self.f2(out)
-        out = self.relu(out)
-        out = self.f3(out)
-        out = self.softmax(out)
-        return out
+"""
 
 
 
 # Training
-num_bits = 8
-num_episodes = 40000
-episode_length = 20
+num_bits = 6
+num_episodes = 10000
+episode_length = 16
 
 env = BitFlippingEnv(num_bits)
-policy = Policy(num_bits, num_bits)
+
+
+policy = PolicyAHG(num_bits*2, num_bits+1)
+# Initialization of weights
 policy.apply(weights_init)
 policy.zero_grad()
-
 optimizer = Adam(policy.parameters(), lr=0.001)
 
+# Keeps track of the current episode
 episode_steps = [0] * episode_length
 for i in range(num_episodes):
 
@@ -99,6 +82,9 @@ for i in range(num_episodes):
 
     if i % 20 == 0:
         print(i ,". Episode reward: ", acc_reward, "distance: ", acc_distance )
+
+
+    # Calculation of gradient
     pg  = 0
     for goal, c in goal_occurances.items():
 
@@ -107,8 +93,9 @@ for i in range(num_episodes):
 
         for state, action in episode_steps:
             if tuple(state) == goal:
-                c-=1
-
+                c -= 1
+                if c == 0:
+                    break
             action_ = policy.forward(to_input(state, goal))
             goal_grad += tor.log(action_[0][np.argmax(action)])*c
 
