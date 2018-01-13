@@ -4,7 +4,7 @@ import numpy as np
 from torch.optim import Adam
 
 from envs import BitFlippingEnv
-from utils import to_tensor, to_input_state_goal, gauss_weights_init
+from utils import to_tensor, gauss_weights_init
 from models import PolicyAHG
 from collections import deque
 
@@ -29,7 +29,7 @@ env = BitFlippingEnv(num_bits)
 policy = PolicyAHG(num_bits*2, num_bits+1)
 
 # Initialization of weights
-policy.apply(gauss_weights_init)
+policy.apply(gauss_weights_init(0,0.02))
 policy.zero_grad()
 optimizer = Adam(policy.parameters(), lr=0.001)
 
@@ -46,6 +46,8 @@ for i in range(num_episodes):
     actions = []
     goal_occurances = {}
     goal_occurances[tuple(env.goal)] = 1
+    state_and_goal = np.zeros((1, num_bits*2))
+
 
     for j in range(episode_length):
 
@@ -55,19 +57,19 @@ for i in range(num_episodes):
 
         hgoal = tuple(state)
         goal_occurances[hgoal] = goal_occurances[hgoal] + 1 if hgoal in goal_occurances else 1
+        state_and_goal[0][0:num_bits] = state
+        state_and_goal[0][num_bits::] = goal
 
-        x = to_tensor(np.expand_dims(np.hstack((state, goal)),0))
-        action_distribution = policy.forward(x).data.numpy()
-        action_distribution = action_distribution[0]
-        action = np.random.choice(action_distribution, p=action_distribution)
-        action = np.argmax(action_distribution == action)
+        x = to_tensor(state_and_goal,0)
+
+        action_distribution = policy.forward(x)
+        action = policy.sample_action()
 
         episode_steps[j] = (state, action)
 
         state, reward, done, _ = env.step(action)
 
         acc_reward += reward
-        acc_distance += env.distance()
 
     mvr_tracker.append(acc_reward)
 
@@ -86,7 +88,9 @@ for i in range(num_episodes):
                 c -= 1
                 if c == 0:
                     break
-            action_ = policy.forward(to_input_state_goal(state, goal))
+            state_and_goal[0][0:num_bits] = state
+            state_and_goal[0][num_bits::] = goal
+            action_ = policy.forward(to_tensor(state_and_goal))
             goal_grad += tor.log(action_[0][a])*c
 
         pg += goal_prob * goal_grad
