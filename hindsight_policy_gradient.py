@@ -28,13 +28,13 @@ def to_numpy(out):
 
 
 """
-    Implementation of the hindsight policy gradients.
+    Implementation of the hindsight policy gradient paper: https://arxiv.org/pdf/1711.06006.pdf.
 
 """
 
 
 
-# Training
+# Training parameters
 num_bits = 8
 num_episodes = 10000
 episode_length = 16
@@ -88,9 +88,8 @@ for i in range(num_episodes):
 
     mvr_tracker.append(acc_reward)
 
-    if i % 20 == 0:
+    if i % 200 == 0:
         print(i,". Moving Average Reward:", np.mean(mvr_tracker), "Acc reward:", acc_reward)
-        print("Goal: ", env.goal, "End State : ", env.state)
 
     # Calculation of gradient
     pg = 0
@@ -113,6 +112,7 @@ for i in range(num_episodes):
     pg.backward()
 
     optimizer.step()
+    optimizer.zero_grad()
     policy.zero_grad()
     env.reset()
 
