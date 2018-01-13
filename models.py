@@ -21,8 +21,9 @@ class PolicyAHG(nn.Module):
     def forward(self, x):
 
         out = self.f1(x)
-        out = self.relu(out)
+        out = self.tanh(out)
         out = self.f2(out)
         out = self.softmax(out)
+        self.out = out
         return out
 
