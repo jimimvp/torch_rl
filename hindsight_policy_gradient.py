@@ -1,30 +1,12 @@
 import torch as tor
 import numpy as np
-from tqdm import tqdm
 
-import torch
-import torch.nn as nn
 from torch.optim import Adam
-import torch.nn.functional as F
 
 from envs import BitFlippingEnv
-from utils import to_tensor
+from utils import to_tensor, to_input_state_goal, gauss_weights_init
 from models import PolicyAHG
 from collections import deque
-
-def weights_init(m):
-    classname = m.__class__.__name__
-    if classname.find('Linear') != -1:
-        m.weight.data.normal_(0.0, 0.02)
-
-def to_input(state, goal):
-
-    x = np.hstack((state,goal))
-    x = np.expand_dims(x, 0)
-    return to_tensor(x)
-
-def to_numpy(out):
-    return out.data.numpy()
 
 
 """
@@ -45,8 +27,9 @@ env = BitFlippingEnv(num_bits)
 
 
 policy = PolicyAHG(num_bits*2, num_bits+1)
+
 # Initialization of weights
-policy.apply(weights_init)
+policy.apply(gauss_weights_init)
 policy.zero_grad()
 optimizer = Adam(policy.parameters(), lr=0.001)
 
@@ -103,7 +86,7 @@ for i in range(num_episodes):
                 c -= 1
                 if c == 0:
                     break
-            action_ = policy.forward(to_input(state, goal))
+            action_ = policy.forward(to_input_state_goal(state, goal))
             goal_grad += tor.log(action_[0][a])*c
 
         pg += goal_prob * goal_grad
