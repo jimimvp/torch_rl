@@ -9,10 +9,14 @@ def to_tensor(ndarray, volatile=False, requires_grad=False, dtype=tor.FloatTenso
         tor.from_numpy(ndarray), volatile=volatile, requires_grad=requires_grad
     ).type(dtype)
 
-def gauss_weights_init(m, mu, std):
-    classname = m.__class__.__name__
-    if classname.find('Linear') != -1:
-        m.weight.data.normal_(mu, std)
+def gauss_weights_init(mu, std):
+
+    def init(m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            m.weight.data.normal_(mu, std)
+
+    return init
 
 
 def to_input_state_goal(state, goal):
@@ -27,7 +31,7 @@ def to_numpy(out):
 
 
 Transition = namedtuple(
-    'Transition', ('state', 'action', 'mask', 'next_state', 'reward'))
+    'Transition', ('state', 'action', 'next_state', 'reward'))
 
 
 class ReplayMemory(object):
