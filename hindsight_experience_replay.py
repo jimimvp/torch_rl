@@ -43,7 +43,7 @@ for i in range(num_episodes):
     # The reward accumulated in the episode
     acc_reward = 0
     acc_distance = 0
-    actions = []
+    actions = [None] * episode_length
     goal_occurances = {}
     goal_occurances[tuple(env.goal)] = 1
 
@@ -63,12 +63,16 @@ for i in range(num_episodes):
         action = policy.sample_action()
 
         episode_steps[j] = (state, action)
-        state_prev = state
+        state_prev = state.copy()
         state, reward, done, _ = env.step(action)
 
-        episode_steps[j] = Transition(state_prev, action, state, reward)
+        # Calculate change in reward, -1 if the previous state was a goal state and 1 if it is the next goal state
+        reward = -1 if np.array_equal(state_prev, env.goal) and action != num_bits else reward
 
+        episode_steps[j] = Transition(state_prev, action, state, reward)
+        actions[j] = policy.out.data.numpy()
         acc_reward += reward
+
 
     mvr_tracker.append(acc_reward)
 
@@ -81,9 +85,11 @@ for i in range(num_episodes):
     for i, transition_start in enumerate(episode_steps[:-batch_size_episode-1]):
 
         # The replay memory is a pair transition, all transitions after it in episode
-        transitions_after = episode_steps[i+1:]
-        for j, transition in enumerate(transitions_after):
-            transitions_after[j] = Transition(transition.state, transition.action, transition.next_state, 1)
+        transitions_after = []
+        for j, transition in enumerate(episode_steps[i+1:]):
+            transitions_after.append(Transition(transition.state, transition.action, transition.next_state, 1))
+            #transitions_after.append(Transition(transition.state, transition.action, transition.state,
+                                                                        # 1 if transition.action == num_bits else -1))
         replay_memory.append((transition_start, transitions_after))
 
 
@@ -99,17 +105,20 @@ for i in range(num_episodes):
     def onehot(num):
         a = np.zeros(num_bits+1)
         a[num] = 1
+        return a
 
-    batch = np.asarray([np.hstack([x.state, x.next_state, onehot(x.action), reward]) for x in batch_raw], dtype=np.float32)
-    batch_targets = to_tensor(batch[:,num_bits*2:num_bits*2+1])
+    batch = np.asarray([np.hstack([x.state, x.next_state, onehot(x.action), x.reward]) for x in batch_raw], dtype=np.float32)
+    batch_targets = to_tensor(batch[:,num_bits*2:num_bits*3+1])
     batch_input = to_tensor(batch[:,:2*num_bits])
 
-    # print("Batch target shape: ", batch_targets.data.shape, "Batch input shape: ",  batch_input.data.shape)
-    out = policy.forward(batch_input)
-    pg = tor.log(out * batch_targets)
 
-    # To do gradient ascent
-    pg = -tor.sum(pg)
+    out = policy.forward(batch_input)
+
+    # Calculate gradient
+    pg = out * batch_targets
+    pg = pg[pg > 0]
+    pg = tor.log(pg)
+    pg = -tor.mean(pg)
     pg.backward()
 
     optimizer.step()
