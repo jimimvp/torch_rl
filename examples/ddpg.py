@@ -1,0 +1,126 @@
+from torch.optim import Adam
+from utils import *
+from models import SimpleNetwork
+import gym
+from envs import NormalisedActions
+import torch.nn.functional as F
+"""
+    Implementation of deep deterministic policy gradients with soft updates.
+
+"""
+
+def choose_action(actor_output, random_process, epsilon):
+
+    action = actor_output + to_tensor(epsilon*random_process())
+    return action
+
+
+
+
+# Training parameters
+num_bits = 8
+num_episodes = 80000
+episode_length = 500
+batch_size = 32
+tau = 0.9
+epsilon = 1.0
+depsilon = 0.0001
+gamma = 0.9
+replay_capacity = 1000
+
+
+replay_memory = ReplayMemory(capacity=replay_capacity)
+moving_avg_reward = deque(maxlen=100)
+
+
+env = NormalisedActions(gym.make("Pendulum-v0"))
+env.reset()
+num_actions = env.action_space.shape[0]
+num_observations = env.observation_space.shape[0]
+
+random_process = OrnsteinUhlenbeckActionNoise(num_actions)
+
+policy = SimpleNetwork([num_actions, 32, 16, 1])
+target_policy = SimpleNetwork([num_actions, 32, 16, 1])
+critic = SimpleNetwork([num_actions+num_observations, 32, 16, 1])
+target_critic = SimpleNetwork([num_actions+num_observations, 32, 16, 1])
+
+hard_update(target_policy, policy)
+hard_update(target_critic, critic)
+
+
+optimizer_critic = Adam(critic.parameters())
+optimizer_policy = Adam(policy.parameters())
+critic_criterion = tor.nn.MSELoss()
+
+
+# Warmup phase
+state = env.reset()
+for i in range(replay_capacity):
+    action = policy.forward(to_tensor(np.expand_dims(state, 0)))[0]
+    state_prev = state.copy()
+    state, reward, done, info = env.step(action.data.numpy())
+    replay_memory.push(state_prev, action, state, reward)
+
+env.reset()
+for episode in range(num_episodes):
+
+    state = env.reset()
+    acc_reward = 0
+    for i in range(episode_length):
+
+        action = policy.forward(to_tensor(np.expand_dims(state, 0)))[0]
+
+***REMOVED***
+        action = choose_action(action, random_process,epsilon)
+        epsilon-=depsilon
+
+        state_prev = state.copy()
+        state, reward, done, info = env.step(action.data.numpy())
+
+        replay_memory.push(state_prev, action, state, reward)
+
+        acc_reward += reward
+***REMOVED***
+
+        batch = replay_memory.sample(batch_size)
+        s1 = np.asarray([x.state for x in batch])
+        s2 = np.asarray([x.next_state for x in batch])
+        a1 = np.asarray([x.action for x in batch]).reshape((-1,1))
+        r = to_tensor(np.asarray([x.reward for x in batch]).reshape(-1,1))
+
+
+        # Critic optimization
+        a2 = target_policy.forward(to_tensor(s1, requires_grad=True)).data.numpy()
+
+        q2 = target_critic.forward(to_tensor(np.hstack((s2, a2)),requires_grad=True))
+
+        q_expected = r + gamma*q2
+        q_predicted = critic.forward(to_tensor(np.hstack((s2, a2))))
+
+        critic_loss = critic_criterion(q_expected, q_predicted)
+        critic_loss.backward()
+        optimizer_critic.step()
+        optimizer_critic.zero_grad()
+
+***REMOVED***
+
+        pred_a1 = policy.forward(s1)
+        loss_actor = -1 * tor.sum(critic.forward(to_tensor(np.hstack((s1, pred_a1)), requires_grad=True)))
+        loss_actor.backward()
+        optimizer_policy.step()
+        optimizer_policy.zero_grad()
+
+
+        soft_update(target_policy, policy, tau)
+        soft_update(target_critic, critic, tau)
+
+    print("Episode", episode, ". Average reward: ", np.mean(moving_avg_reward))
+
+
+
+
+
+
+
+
