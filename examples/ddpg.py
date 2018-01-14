@@ -3,17 +3,19 @@ from utils import *
 from models import SimpleNetwork
 import gym
 from envs import NormalisedActions
+from core import ActorCriticAgent
 import torch.nn.functional as F
 """
     Implementation of deep deterministic policy gradients with soft updates.
 
 """
 
-def choose_action(actor_output, random_process, epsilon):
+def random_process_action_choice(random_process):
 
-    action = actor_output + to_tensor(epsilon*random_process())
-    return action
-
+    def func(actor_output, epsilon):
+        action = actor_output + to_tensor(epsilon*random_process())
+        return action
+    return func
 
 
 
@@ -38,7 +40,7 @@ env.reset()
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]
 
-random_process = OrnsteinUhlenbeckActionNoise(num_actions)
+action_choice_function = random_process_action_choice(OrnsteinUhlenbeckActionNoise(num_actions))
 
 policy = SimpleNetwork([num_actions, 32, 16, 1])
 target_policy = SimpleNetwork([num_actions, 32, 16, 1])
@@ -48,16 +50,19 @@ target_critic = SimpleNetwork([num_actions+num_observations, 32, 16, 1])
 hard_update(target_policy, policy)
 hard_update(target_critic, critic)
 
+target_agent = ActorCriticAgent(target_policy, target_critic)
+agent = ActorCriticAgent(policy, critic)
 
-optimizer_critic = Adam(critic.parameters())
-optimizer_policy = Adam(policy.parameters())
+
+optimizer_critic = Adam(agent.critic_network.parameters())
+optimizer_policy = Adam(agent.policy_network.parameters())
 critic_criterion = tor.nn.MSELoss()
 
 
 # Warmup phase
 state = env.reset()
 for i in range(replay_capacity):
-    action = policy.forward(to_tensor(np.expand_dims(state, 0)))[0]
+    action = agent.action(state)
     state_prev = state.copy()
     state, reward, done, info = env.step(action.data.numpy())
     replay_memory.push(state_prev, action, state, reward)
@@ -69,10 +74,10 @@ for episode in range(num_episodes):
     acc_reward = 0
     for i in range(episode_length):
 
-        action = policy.forward(to_tensor(np.expand_dims(state, 0)))[0]
+        action = agent.action(state)
 
         # Choose action with exploration
-        action = choose_action(action, random_process,epsilon)
+        action = action_choice_function(action, epsilon)
         epsilon-=depsilon
 
         state_prev = state.copy()
@@ -91,12 +96,12 @@ for episode in range(num_episodes):
 
 
         # Critic optimization
-        a2 = target_policy.forward(to_tensor(s1, requires_grad=True)).data.numpy()
+        a2 = target_agent.actions(s1).data.numpy()
 
-        q2 = target_critic.forward(to_tensor(np.hstack((s2, a2)),requires_grad=True))
+        q2 = target_agent.values(s2,a2)
 
         q_expected = r + gamma*q2
-        q_predicted = critic.forward(to_tensor(np.hstack((s2, a2))))
+        q_predicted = agent.values(s2, a2)
 
         critic_loss = critic_criterion(q_expected, q_predicted)
         critic_loss.backward()
@@ -105,15 +110,15 @@ for episode in range(num_episodes):
 
         # Actor optimization
 
-        pred_a1 = policy.forward(s1)
-        loss_actor = -1 * tor.sum(critic.forward(to_tensor(np.hstack((s1, pred_a1)), requires_grad=True)))
+        pred_a1 = agent.actions(s1, requires_grad=True)
+        loss_actor = -1 * tor.sum(agent.values(s1, pred_a1))
         loss_actor.backward()
         optimizer_policy.step()
         optimizer_policy.zero_grad()
 
 
-        soft_update(target_policy, policy, tau)
-        soft_update(target_critic, critic, tau)
+        soft_update(target_agent.policy_network, agent.policy_network, tau)
+        soft_update(target_agent.critic_network, agent.critic_network, tau)
 
     print("Episode", episode, ". Average reward: ", np.mean(moving_avg_reward))
 
