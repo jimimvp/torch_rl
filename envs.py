@@ -1,5 +1,5 @@
 import numpy as np
-
+import gym
 
 class Environment(object):
 
@@ -42,9 +42,19 @@ class BitFlippingEnv(object):
 
 
 
-env = BitFlippingEnv(10)
 
-# for i in range(10):
-#     obs, rew, done, info = env.step(i)
-#     print(obs, rew, done, info)
-#
+class NormalizedActions(gym.ActionWrapper):
+
+    def _action(self, action):
+        action = (action + 1) / 2  # [-1, 1] => [0, 1]
+        action *= (self.action_space.high - self.action_space.low)
+        action += self.action_space.low
+        return action
+
+    def _reverse_action(self, action):
+        action -= self.action_space.low
+        action /= (self.action_space.high - self.action_space.low)
+        action = action * 2 - 1
+        return actions
+
+

@@ -14,7 +14,7 @@ from models import PolicySPG
 
 # Training parameters
 num_bits = 8
-num_episodes = 40000
+num_episodes = 80000
 episode_length = 16
 batch_size = 16
 # How many from the same episode
@@ -107,7 +107,7 @@ for i in range(num_episodes):
         a[num] = 1
         return a
 
-    batch = np.asarray([np.hstack([x.state, x.next_state, onehot(x.action), x.reward]) for x in batch_raw], dtype=np.float32)
+    batch = np.asarray([np.hstack([x.state, x.next_state, onehot(x.action)*x.reward, x.reward]) for x in batch_raw], dtype=np.float32)
     batch_targets = to_tensor(batch[:,num_bits*2:num_bits*3+1])
     batch_input = to_tensor(batch[:,:2*num_bits])
 
