@@ -25,7 +25,7 @@ class BitFlippingEnv(object):
     def step(self, action):
         if action < self.state.size:
             self.state[action] ^= 1
-        self.done = np.alltrue(self.state == self.goal)
+        self.done = np.array_equal(self.state, self.goal)
 
         return self.state, int(self.done), self.done, {}
 
