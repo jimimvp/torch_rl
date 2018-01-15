@@ -77,6 +77,9 @@ class OrnsteinUhlenbeckActionNoise:
         self.X = self.X + dx
         return self.X
 
+    def __call__(self, *args, **kwargs):
+        return self.sample()
+
 
 class ReplayMemory(object):
     def __init__(self, capacity):
@@ -91,3 +94,5 @@ class ReplayMemory(object):
 
     def __len__(self):
         return len(self.memory)
+
+#TODO Implement Hindsight Replay Memory
