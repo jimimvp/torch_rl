@@ -17,7 +17,8 @@ def random_process_action_choice(random_process):
         return action
     return func
 
-
+def mse_loss(input, target):
+    return tor.mean(tor.sum((input - target)**2))
 
 # Training parameters
 num_bits = 8
@@ -56,7 +57,7 @@ agent = ActorCriticAgent(policy, critic)
 
 optimizer_critic = Adam(agent.critic_network.parameters())
 optimizer_policy = Adam(agent.policy_network.parameters())
-critic_criterion = tor.nn.MSELoss()
+critic_criterion = mse_loss
 
 
 # Warmup phase
@@ -101,7 +102,7 @@ for episode in range(num_episodes):
         q2 = target_agent.values(s2,a2)
 
         q_expected = r + gamma*q2
-        q_predicted = agent.values(s2, a2)
+        q_predicted = agent.values(s2, a2, requires_grad=True)
 
         critic_loss = critic_criterion(q_expected, q_predicted)
         critic_loss.backward()
@@ -110,8 +111,8 @@ for episode in range(num_episodes):
 
         # Actor optimization
 
-        pred_a1 = agent.actions(s1, requires_grad=True)
-        loss_actor = -1 * tor.sum(agent.values(s1, pred_a1))
+        pred_a1 = agent.actions(s1, requires_grad=True).data.numpy()
+        loss_actor = -1 * tor.sum(agent.values(s1, pred_a1, requires_grad=True))
         loss_actor.backward()
         optimizer_policy.step()
         optimizer_policy.zero_grad()
