@@ -23,23 +23,23 @@ def mse_loss(input, target):
 # Training parameters
 num_bits = 8
 num_episodes = 80000
-episode_length = 500
 batch_size = 32
 tau = 0.9
 epsilon = 1.0
 depsilon = 0.0001
 gamma = 0.9
-replay_capacity = 1000
-
+replay_capacity = 100
+max_episode_length = 500
 
 replay_memory = ReplayMemory(capacity=replay_capacity)
-moving_avg_reward = deque(maxlen=100)
+moving_avg_reward = deque(maxlen=replay_capacity)
 
 
 env = NormalisedActions(gym.make("Pendulum-v0"))
 env.reset()
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]
+
 
 action_choice_function = random_process_action_choice(OrnsteinUhlenbeckActionNoise(num_actions))
 
@@ -73,7 +73,7 @@ for episode in range(num_episodes):
 
     state = env.reset()
     acc_reward = 0
-    for i in range(episode_length):
+    for i in range(max_episode_length):
 
         action = agent.action(state)
 
@@ -94,7 +94,6 @@ for episode in range(num_episodes):
         s2 = np.asarray([x.next_state for x in batch])
         a1 = np.asarray([x.action for x in batch]).reshape((-1,1))
         r = to_tensor(np.asarray([x.reward for x in batch]).reshape(-1,1))
-
 
         # Critic optimization
         a2 = target_agent.actions(s1).data.numpy()
@@ -117,11 +116,15 @@ for episode in range(num_episodes):
         optimizer_policy.step()
         optimizer_policy.zero_grad()
 
-
         soft_update(target_agent.policy_network, agent.policy_network, tau)
         soft_update(target_agent.critic_network, agent.critic_network, tau)
 
-    print("Episode", episode, ". Average reward: ", np.mean(moving_avg_reward))
+    print("Episode", episode, " Accumulated Rewrad: ", acc_reward)
+
+    if episode % 100 == 0 and episode != 0:
+        print("#" * 100)
+        print("Episode", episode, ". Average reward: ", np.mean(moving_avg_reward))
+        print("#" * 100)
 
 
 
