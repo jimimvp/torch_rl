@@ -103,7 +103,7 @@ for episode in range(num_episodes):
         q2 = target_agent.values(s2,a2)
 
         q_expected = r + gamma*q2
-        q_predicted = agent.values(s2, a2, requires_grad=True)
+        q_predicted = agent.values(s1, a1, requires_grad=True)
 
         critic_loss = critic_criterion(q_expected, q_predicted)
         critic_loss.backward()
