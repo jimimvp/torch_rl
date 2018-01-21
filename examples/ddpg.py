@@ -30,6 +30,8 @@ depsilon = 0.0001
 gamma = 0.9
 replay_capacity = 100
 max_episode_length = 500
+learning_rate = 1e-4
+
 
 replay_memory = ReplayMemory(capacity=replay_capacity)
 moving_avg_reward = deque(maxlen=replay_capacity)
@@ -55,8 +57,8 @@ target_agent = ActorCriticAgent(target_policy, target_critic)
 agent = ActorCriticAgent(policy, critic)
 
 
-optimizer_critic = Adam(agent.critic_network.parameters())
-optimizer_policy = Adam(agent.policy_network.parameters())
+optimizer_critic = Adam(agent.critic_network.parameters(), lr=learning_rate)
+optimizer_policy = Adam(agent.policy_network.parameters(), lr=learning_rate)
 critic_criterion = mse_loss
 
 
