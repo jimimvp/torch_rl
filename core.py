@@ -125,3 +125,22 @@ class ActorCriticAgent(Agent):
             out = self.forward(x)
             self.out = out
             return out
+
+
+
+class SpikingNetwork(object):
+    """
+       A similar interface to pytorch for easier plug-in.
+    """
+
+
+    def __init__(self, dt, sim_dt):
+        super(SpikingNetwork, self).__init__()
+        self.dt = dt
+        self.sim_dt = sim_dt
+
+    def forward(self, x):
+        raise NotImplementedError("Forward pass has to be implemented for spiking network")
+
+
+
