@@ -40,25 +40,22 @@ class SimpleNetwork(Policy):
 
         self.activation_functions = activation_functions
         self.layer_list = []
-        self.fc0 = nn.Linear(architecture[0], architecture[1])
-        for i in range(1, len(architecture)-1):
+        for i in range(len(architecture)-1):
             self.layer_list.append(nn.Linear(architecture[i], architecture[i+1]))
             setattr(self, "fc" + str(i), self.layer_list[-1])
 
         self.apply(weight_init)
 
     def forward(self, x):
-        out = x
         if self.activation_functions:
             for i, func in enumerate(self.activation_functions):
-                out = self.activation_functions[i](self.layer_list[i](out))
+                x = func(self.layer_list[i](x))
         else:
-            if self.activation_functions:
-                for i, func in enumerate(self.activation_functions):
-                    x = self.relu(self.layer_list[i](x))
+            for i, layer in enumerate(self.layer_list):
+                x = self.relu(layer(x))
 
-        self.out = out
-        return out
+        self.out = x
+        return x
 
 
 
@@ -141,7 +138,7 @@ class Reservoir(SpikingNetwork):
             """
                 Connect input to ensemble.
             """
-            nengo.Connection(self.input_node, state_ensemble)
+            nengo.Connection(self.input_node, state_ensemble.neurons, transform=np.random.normal(0.1,0.2,(network_size,input_size)))
 
 
             """
@@ -152,19 +149,22 @@ class Reservoir(SpikingNetwork):
         self.sim = nengo.Simulator(network=self.model, dt=sim_dt)
         self.dt_steps = int(self.dt / self.sim_dt)
 
-    def forward(self, x):
+    def forward(self, x, requires_grad=False):
+        if tor.is_tensor(x):
+            x = x.data.numpy()
         if len(x.shape) >= 2 and x.shape[0] > 1:
             return self.batch_forward(x)
         else:
             x = x.reshape(-1)
         self.input_node.output = x
-        self.sim.run_steps(self.dt_steps)
+        self.sim.run_steps(self.dt_steps, progress_bar=False)
 
         out = self.sim.data[self.output_probe]
         """
             Take the average of all steps as output.
         """
         out = np.mean(out[-self.dt_steps:-1], axis=0)
+        out = out.reshape(1, -1)
         return out
 
 
@@ -175,25 +175,43 @@ class Reservoir(SpikingNetwork):
         return np.vstack(out)
 
     def reset(self):
-        self.sim = nengo.Simulator(network=self.model, dt=self.sim_dt)
+        self.sim.reset()
 
 
 
 
-#TODO
-class LSMSpikingAgent(Agent):
+
+class SimpleSpikingAgent(Agent):
     """
         Implements liquid state machine agent with a neural network for readout.
     """
 
+    def __init__(self, spiking_net, readout_net, action_choice_function=return_output):
+        super(SimpleSpikingAgent, self).__init__(policy_network=readout_net, action_choice_function=action_choice_function)
+        self.spiking_net = spiking_net
+        self.spiking_state = None
 
-    def __init__(self, dt, spiking_net, readout_net):
-        pass
+    def action(self, *args, requires_grad=False):
+        if len(args) > 1:
+            x = np.hstack(args)
+        else:
+            x = args[0]
+        x = self.spiking_net.forward(x)
+        self.spiking_net.reset()
+        self.spiking_state = x
+        out = self.forward(to_tensor(x))
+        return out
 
 
+    def actions(self, *args, requires_grad=False):
+        if len(args) > 1:
+            x = np.hstack(args)
+        else:
+            x = args[0]
+        x = self.spiking_net.forward(x)
+        self.spiking_net.reset()
+        self.spiking_state = x
+        out = self.forward(to_tensor(x))
+        return out
 
-reservoir = Reservoir(dt=0.1, sim_dt=1e-2, input_size=5, network_size=200)
-batch = np.ones((10,5))
 
-out = reservoir.forward(batch)
-print(out.shape)

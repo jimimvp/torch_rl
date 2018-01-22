@@ -17,9 +17,9 @@ class Agent(Module):
         super(Agent, self).__init__()
         self.policy_network = policy_network
         self.action_choice_function = action_choice_function
+        print("Agent initialized...")
 
     def forward(self, x):
-
         out = self.policy_network.forward(x)
         return out
 
@@ -66,9 +66,9 @@ class Agent(Module):
             return out
 
 
-    def choose_action(self, x):
+    def choose_action(self, *args):
 
-        action = self.forward(x)
+        action = self.action(*args)
         action = self.action_choice_function(action)
         return action
 
