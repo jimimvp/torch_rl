@@ -2,7 +2,7 @@ import torch as tor
 from torch import nn
 import numpy as np
 from utils import gauss_weights_init
-
+from core import *
 
 class Policy(nn.Module):
     def __init__(self):
@@ -108,3 +108,92 @@ class PolicySPG(StochasticPolicy):
         return out
 
 
+
+import nengo
+class Reservoir(SpikingNetwork):
+
+
+    def __init__(self,dt, sim_dt, input_size, network_size=800, recursive=False, spectral_radius=1., noise=False):
+        super(Reservoir, self).__init__(dt, sim_dt)
+        self.model = nengo.Network(seed=60)
+        with self.model as model:
+            """
+                Network configurations.
+            """
+            self.input_node = nengo.Node(np.zeros(input_size))
+            # Noise
+            if noise:
+                noise = nengo.processes.WhiteNoise(dist=nengo.dists.Gaussian(0,0.5),default_size_out=input_size)
+
+            # If specified create reservoir for the state
+            state_ensemble = nengo.Ensemble(network_size, dimensions=input_size)
+
+            if recursive:
+                # l2 = nengo.Ensemble(200, dimensions=observation_size)
+                W = np.random.uniform(-0.2, 0.2, (state_ensemble.n_neurons, state_ensemble.n_neurons))
+                eig, eigv = np.linalg.eig(W)
+                W = W / np.max(np.abs(eig)) * spectral_radius
+
+                print('Spectral radius of reservoir weights: ', spectral_radius)
+
+                nengo.Connection(state_ensemble.neurons, state_ensemble.neurons, transform=W)
+
+            """
+                Connect input to ensemble.
+            """
+            nengo.Connection(self.input_node, state_ensemble)
+
+
+            """
+                This is the output that is going to be read out after simulation ends.
+            """
+            self.output_probe = nengo.Probe(state_ensemble.neurons)
+
+        self.sim = nengo.Simulator(network=self.model, dt=sim_dt)
+        self.dt_steps = int(self.dt / self.sim_dt)
+
+    def forward(self, x):
+        if len(x.shape) >= 2 and x.shape[0] > 1:
+            return self.batch_forward(x)
+***REMOVED***
+            x = x.reshape(-1)
+        self.input_node.output = x
+        self.sim.run_steps(self.dt_steps)
+
+        out = self.sim.data[self.output_probe]
+        """
+            Take the average of all steps as output.
+        """
+        out = np.mean(out[-self.dt_steps:-1], axis=0)
+        return out
+
+
+    def batch_forward(self, x):
+        out = []
+        for i in range(x.shape[0]):
+            out.append(self.forward(x[i]))
+        return np.vstack(out)
+
+    def reset(self):
+        self.sim = nengo.Simulator(network=self.model, dt=self.sim_dt)
+
+
+
+
+#TODO
+class LSMSpikingAgent(Agent):
+    """
+        Implements liquid state machine agent with a neural network for readout.
+    """
+
+
+    def __init__(self, dt, spiking_net, readout_net):
+***REMOVED***
+
+
+
+reservoir = Reservoir(dt=0.1, sim_dt=1e-2, input_size=5, network_size=200)
+batch = np.ones((10,5))
+
+out = reservoir.forward(batch)
+print(out.shape)
