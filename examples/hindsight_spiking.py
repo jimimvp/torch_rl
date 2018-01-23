@@ -1,12 +1,12 @@
 from collections import deque
 
-from torch.optim import Adam
-from envs import NormalisedActions
-from utils import *
-from models import SimpleNetwork, Reservoir, SimpleSpikingAgent
 import gym
-import sys
 import torch as tor
+from torch.optim import Adam
+from torch_rl.utils import *
+
+from torch_rl.models import SimpleNetwork, Reservoir, SimpleSpikingAgent
+
 """
     Implementation of the hindsight experience replay with spiking reservoir and
     ANN readout.
@@ -17,14 +17,14 @@ import torch as tor
 
 # Training parameters
 num_episodes = 40000
-episode_length = 500
-batch_size = 16
+episode_length = 2000
+batch_size = 64
 # How many from the same episode
 batch_size_episode = 4
 
 # Tracks the mean reward over a certain amount of episodes
 mvr_tracker = deque(maxlen=50)
-replay_memory = deque(maxlen=300)
+replay_memory = deque(maxlen=5000)
 
 env = gym.make("MountainCar-v0")
 env.reset()

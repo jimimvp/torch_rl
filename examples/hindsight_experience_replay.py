@@ -1,9 +1,10 @@
 from collections import deque
 
 from torch.optim import Adam
-from envs import BitFlippingEnv
-from utils import *
-from models import PolicySPG
+from torch_rl.utils import *
+
+from torch_rl.envs import BitFlippingEnv
+from torch_rl.models import PolicySPG
 
 """
     Implementation of the hindsight experience replay: https://arxiv.org/pdf/1711.06006.pdf.

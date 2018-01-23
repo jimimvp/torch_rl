@@ -1,13 +1,12 @@
-import torch as tor
-import numpy as np
-
-from torch.optim import Adam
-
-from envs import BitFlippingEnv
-from utils import to_tensor, gauss_weights_init
-from models import PolicyAHG
 from collections import deque
 
+import numpy as np
+import torch as tor
+from torch.optim import Adam
+from torch_rl.utils import to_tensor, gauss_weights_init
+
+from torch_rl.envs import BitFlippingEnv
+from torch_rl.models import PolicyAHG
 
 """
     Implementation of the hindsight policy gradient paper: https://arxiv.org/pdf/1711.06006.pdf.
