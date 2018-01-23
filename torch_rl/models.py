@@ -1,8 +1,8 @@
-import torch as tor
 from torch import nn
-import numpy as np
 from utils import gauss_weights_init
-from core import *
+
+from torch_rl.core import *
+
 
 class Policy(nn.Module):
     def __init__(self):
