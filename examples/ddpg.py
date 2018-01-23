@@ -1,10 +1,11 @@
-from torch.optim import Adam
-from utils import *
-from models import SimpleNetwork
 import gym
-from envs import NormalisedActions
-from core import ActorCriticAgent
-import torch.nn.functional as F
+from torch.optim import Adam
+from torch_rl.utils import *
+
+from torch_rl.models import SimpleNetwork
+from torch_rl.core import ActorCriticAgent
+from torch_rl.envs import NormalisedActions
+
 """
     Implementation of deep deterministic policy gradients with soft updates.
 
