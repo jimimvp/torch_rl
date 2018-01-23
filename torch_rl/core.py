@@ -1,7 +1,11 @@
-import torch as tor
 from torch.nn import Module
 import numpy as np
-from utils import to_tensor
+from torch_rl.utils import to_tensor
+import numpy as np
+from torch.nn import Module
+
+from torch_rl.utils import to_tensor
+
 
 def return_output(action):
     return action
