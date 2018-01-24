@@ -5,10 +5,20 @@ import random
 from collections import namedtuple, deque
 
 
-def to_tensor(ndarray, volatile=False, requires_grad=False, dtype=tor.FloatTensor):
+def to_tensor(ndarray, volatile=False, requires_grad=False, dtype=tor.FloatTensor, cuda=True):
+    if cuda:
+        return cuda_if_available(Variable(
+            tor.from_numpy(ndarray), volatile=volatile, requires_grad=requires_grad
+        ).type(dtype))
     return Variable(
         tor.from_numpy(ndarray), volatile=volatile, requires_grad=requires_grad
     ).type(dtype)
+
+def cuda_if_available(model):
+    if tor.cuda.device_count() > 0:
+        return model.cuda()
+    else:
+        return model
 
 
 def gauss_weights_init(mu, std):
