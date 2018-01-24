@@ -58,8 +58,8 @@ critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, 32, 16,
 target_critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, 32, 16, num_actions],
                            activation_functions=[relu,relu,relu]))
 
-policy.apply(gauss_weights_init(0,.2))
-critic.apply(gauss_weights_init(0,.2))
+policy.apply(gauss_init(0,.2))
+critic.apply(gauss_init(0,.2))
 
 hard_update(target_policy, policy)
 hard_update(target_critic, critic)
