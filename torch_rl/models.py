@@ -1,5 +1,5 @@
 from torch import nn
-from utils import gauss_weights_init
+from torch_rl.utils import gauss_weights_init
 
 from torch_rl.core import *
 
