@@ -1,4 +1,5 @@
 from torch.nn import Module
+import torch as tor
 import numpy as np
 from torch_rl.utils import to_tensor
 import numpy as np
@@ -57,8 +58,12 @@ class Agent(Module):
         :return: Output of the network in batch shape
         """
         if len(args) > 1:
-            x = np.hstack(args)
-            x = to_tensor(x, requires_grad=requires_grad)
+            if len(args) > 1:
+                if not tor.is_tensor(args[0]):
+                    x = np.hstack(args)
+                    x = to_tensor(x, requires_grad=requires_grad)
+        ***REMOVED***
+                    x = tor.cat(args, 1)
             out = self.forward(x)
             self.out = out
             return out
@@ -117,9 +122,13 @@ class ActorCriticAgent(Agent):
         :param args: List of inputs to the network
         :return: Output of the network in batch shape
         """
+
         if len(args) > 1:
-            x = np.hstack(args)
-            x = to_tensor(x, requires_grad=requires_grad)
+            if not tor.is_tensor(args[0].data ):
+                x = np.hstack(args)
+                x = to_tensor(x, requires_grad=requires_grad)
+    ***REMOVED***
+                x = tor.cat(args, 1)
             out = self.critic_forward(x)
             self.out = out
             return out
