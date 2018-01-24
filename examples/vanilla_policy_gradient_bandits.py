@@ -95,7 +95,7 @@ for i in tqdm(range(num_episodes)):
         batch_states = batch[:, 0:num_observations]
         batch_actions = batch[:, num_observations:num_observations+num_actions]
         # Calculate gradient
-        pg = -tor.mean(tor.log(batch_actions[batch_actions>0]) * batch_rewards)
+        pg = -tor.mean(tor.log(batch_actions[(batch_actions>0).detach()] * batch_rewards))
         pg.backward(retain_graph=True)
 
 
