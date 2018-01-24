@@ -30,6 +30,16 @@ def gauss_weights_init(mu, std):
     return init
 
 
+def gauss_init(mu, std):
+    def init(m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            m.weight.data.normal_(mu, std)
+            m.bias.data.normal_(mu, std)
+
+    return init
+
+
 def to_input_state_goal(state, goal):
     x = np.hstack((state, goal))
     x = np.expand_dims(x, 0)
