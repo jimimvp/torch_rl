@@ -3,17 +3,6 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-class Environment(object):
-
-
-    def __init__(self):
-        pass
-
-
-    def step(self, action):
-        pass
-
-
 class BitFlippingEnv(object):
 
 
@@ -85,7 +74,7 @@ class BanditEnv(gym.Env):
 
     def _step(self,a):
         bandit_rewards = [self.np_random.choice([-1,1], p=[1-p, p]) for p in self.bandit_distributions]
-        self.state = bandit_rewards
+        self.state = np.asarray(bandit_rewards)
         return self._get_obs(), bandit_rewards[a], False, {}
 
     def _reset(self):
