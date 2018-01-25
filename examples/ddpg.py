@@ -109,7 +109,7 @@ for episode in range(num_episodes):
         r = to_tensor(np.asarray([x.reward for x in batch]).reshape(-1,1))
 
         # Critic optimization
-        a2 = target_agent.actions(s1).cpu().data.numpy()
+        a2 = target_agent.actions(s2).cpu().data.numpy()
 
         q2 = target_agent.values(s2,a2)
 
