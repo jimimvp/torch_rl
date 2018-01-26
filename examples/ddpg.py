@@ -27,7 +27,7 @@ def mse_loss(input, target):
 # Training parameters
 num_bits = 8
 num_episodes = 80000
-batch_size = 64
+batch_size = 32
 tau = 0.001
 epsilon = 1.0
 depsilon = 0.0001
@@ -56,7 +56,7 @@ target_policy =  cuda_if_available(SimpleNetwork([num_observations, 32, 16, num_
 critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, 32, 16, num_actions],
                            activation_functions=[relu,relu,relu]))
 target_critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, 32, 16, num_actions],
-                           activation_functions=[relu,relu,relu]))
+                           activation_functions=[relu,relu]))
 
 policy.apply(gauss_init(0,.2))
 critic.apply(gauss_init(0,.2))
