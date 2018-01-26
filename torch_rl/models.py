@@ -54,6 +54,11 @@ class SimpleNetwork(Policy):
             for i, layer in enumerate(self.layer_list):
                 x = self.relu(layer(x))
 
+        i+=1
+        while i < len(self.layer_list):
+            x = self.layer_list[i](x)
+            i+=1
+
         self.out = x
         return x
 
