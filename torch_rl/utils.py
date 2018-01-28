@@ -82,14 +82,19 @@ def hard_update(target, source):
     Color printing functions.
 """
 
-def prRed(prt): print("\033[91m {}\033[00m" .format(prt))
-def prGreen(prt): print("\033[92m {}\033[00m" .format(prt))
-def prYellow(prt): print("\033[93m {}\033[00m" .format(prt))
-def prLightPurple(prt): print("\033[94m {}\033[00m" .format(prt))
-def prPurple(prt): print("\033[95m {}\033[00m" .format(prt))
-def prCyan(prt): print("\033[96m {}\033[00m" .format(prt))
-def prLightGray(prt): print("\033[97m {}\033[00m" .format(prt))
-def prBlack(prt): print("\033[98m {}\033[00m" .format(prt))
+def prRed(prt, flush=False): print("\033[91m {}\033[00m" .format(prt), flush=flush)
+def prGreen(prt, flush=False): print("\033[92m {}\033[00m" .format(prt), flush=flush)
+def prYellow(prt, flush=False): print("\033[93m {}\033[00m" .format(prt),flush=flush)
+def prLightPurple(prt, flush=False): print("\033[94m {}\033[00m" .format(prt), flush=flush)
+def prPurple(prt, flush=False): print("\033[95m {}\033[00m" .format(prt), flush=flush)
+def prCyan(prt, flush=False): print("\033[96m {}\033[00m" .format(prt), flush=flush)
+def prLightGray(prt, flush=False): print("\033[97m {}\033[00m" .format(prt), flush=flush)
+def prBlack(prt, flush=False): print("\033[98m {}\033[00m" .format(prt), flush=flush)
+
+def loop_print(prt, r):
+    for i in r:
+        print("\r\033[96m {}\033[00m".format(prt.format(i+1, len(r))), end="", flush=True)
+        yield i
 
 
 
