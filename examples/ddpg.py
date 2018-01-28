@@ -54,7 +54,7 @@ policy = cuda_if_available(SimpleNetwork([num_observations, 32, 16, num_actions]
 target_policy =  cuda_if_available(SimpleNetwork([num_observations, 32, 16, num_actions],
                            activation_functions=[relu,relu,tanh ]))
 critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, 32, 16, num_actions],
-                           activation_functions=[relu,relu,relu]))
+                           activation_functions=[relu,relu]))
 target_critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, 32, 16, num_actions],
                            activation_functions=[relu,relu]))
 
