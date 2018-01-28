@@ -28,7 +28,7 @@ class Agent(Module):
         out = self.policy_network.forward(x)
         return out
 
-    def action(self, *args, requires_grad=False):
+    def action(self, *args, **kwargs):
         """
         To be called in non-batch call.
         :param args: List of inputs to the network
@@ -38,20 +38,20 @@ class Agent(Module):
         if len(args) > 1:
             x = np.hstack(args)
             x = np.expand_dims(x, 0)
-            x = to_tensor(x, requires_grad=requires_grad)
+            x = to_tensor(x, **kwargs)
             out = self.forward(x)
             self.out = out[0]
             return out[0]
 ***REMOVED***
             x = args[0]
             x = np.expand_dims(x, 0)
-            x = to_tensor(x, requires_grad=requires_grad)
+            x = to_tensor(x, **kwargs)
             out = self.forward(x)
             self.out = out[0]
             return out[0]
 
 
-    def actions(self, *args, requires_grad=False):
+    def actions(self, *args, **kwargs):
         """
         To be called in a batch call.
         :param args: List of inputs to the network
@@ -61,7 +61,7 @@ class Agent(Module):
             if len(args) > 1:
                 if not tor.is_tensor(args[0]):
                     x = np.hstack(args)
-                    x = to_tensor(x, requires_grad=requires_grad)
+                    x = to_tensor(x, **kwargs)
         ***REMOVED***
                     x = tor.cat(args, 1)
             out = self.forward(x)
@@ -69,7 +69,7 @@ class Agent(Module):
             return out
 ***REMOVED***
             x = args[0]
-            x = to_tensor(x, requires_grad=requires_grad)
+            x = to_tensor(x, **kwargs)
             out = self.forward(x)
             self.out = out
             return out
@@ -93,7 +93,7 @@ class ActorCriticAgent(Agent):
         critic_out = self.critic_network.forward(x)
         return critic_out
 
-    def value(self, *args, requires_grad=False):
+    def value(self, *args, **kwargs):
         """
         To be called in non-batch call.
         :param args: List of inputs to the network
@@ -103,20 +103,20 @@ class ActorCriticAgent(Agent):
         if len(args) > 1:
             x = np.hstack(args)
             x = np.expand_dims(x, 0)
-            x = to_tensor(x, requires_grad=requires_grad)
+            x = to_tensor(x, **kwargs)
             out = self.critic_forward(x)
             self.out = out[0]
             return out[0]
 ***REMOVED***
             x = args[0]
             x = np.expand_dims(x, 0)
-            x = to_tensor(x, requires_grad=requires_grad)
+            x = to_tensor(x, **kwargs)
             out = self.critic_forward(x)
             self.out = out[0]
             return out[0]
 
 
-    def values(self, *args, requires_grad=False):
+    def values(self, *args, **kwargs):
         """
         To be called in a batch call.
         :param args: List of inputs to the network
@@ -124,9 +124,9 @@ class ActorCriticAgent(Agent):
         """
 
         if len(args) > 1:
-            if not tor.is_tensor(args[0].data ):
+            if not tor.is_tensor(args[0].data):
                 x = np.hstack(args)
-                x = to_tensor(x, requires_grad=requires_grad)
+                x = to_tensor(x, **kwargs)
     ***REMOVED***
                 x = tor.cat(args, 1)
             out = self.critic_forward(x)
@@ -134,8 +134,9 @@ class ActorCriticAgent(Agent):
             return out
 ***REMOVED***
             x = args[0]
-            x = to_tensor(x, requires_grad=requires_grad)
-            out = self.forward(x)
+            if not tor.is_tensor(x.data):
+                x = to_tensor(x, **kwargs)
+            out = self.critic_forward(x)
             self.out = out
             return out
 
