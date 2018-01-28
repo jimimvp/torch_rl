@@ -2,13 +2,15 @@ import gym
 from torch.optim import Adam
 from torch_rl.utils import *
 from tqdm import tqdm
+import time
 
 from torch_rl.models import SimpleNetwork
 from torch_rl.core import ActorCriticAgent
 from torch_rl.envs import NormalisedActions
 from collections import deque
 from torch_rl.utils import gauss_weights_init
-
+from torch_rl.memory import SequentialMemory
+import itertools
 """
     Implementation of deep deterministic policy gradients with soft updates.
 
@@ -22,23 +24,26 @@ def random_process_action_choice(random_process):
     return func
 
 def mse_loss(input, target):
-    return tor.mean(tor.sum((input - target)**2))
+    return tor.mean(tor.sum((input-target)**2))
 
 # Training parameters
-num_bits = 8
 num_episodes = 80000
-batch_size = 32
+batch_size = 64
 tau = 0.001
 epsilon = 1.0
-depsilon = 0.0001
+depsilon = 1./50000
 gamma = 0.99
-replay_capacity = 100000
-max_episode_length = 1000
+replay_capacity = 1000000
+warmup = 2000
+max_episode_length = 500
 actor_learning_rate = 1e-4
 critic_learning_rate = 1e-3
+middle_layer_size = [400,300]
+weight_init_sigma = 0.003
 
-replay_memory = ReplayMemory(capacity=replay_capacity)
-moving_avg_reward = deque(maxlen=replay_capacity)
+
+
+replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
 
 env = NormalisedActions(gym.make("Pendulum-v0"))
@@ -47,19 +52,20 @@ num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]
 relu, tanh = tor.nn.ReLU(), tor.nn.Tanh()
 
-action_choice_function = random_process_action_choice(OrnsteinUhlenbeckActionNoise(num_actions))
+random_process = OrnsteinUhlenbeckActionNoise(num_actions, sigma=0.2)
+action_choice_function = random_process_action_choice(random_process)
 
-policy = cuda_if_available(SimpleNetwork([num_observations, 32, 16, num_actions],
+policy = cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
                            activation_functions=[relu,relu,tanh]))
-target_policy =  cuda_if_available(SimpleNetwork([num_observations, 32, 16, num_actions],
+target_policy =  cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
                            activation_functions=[relu,relu,tanh ]))
-critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, 32, 16, num_actions],
+critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, middle_layer_size[0], middle_layer_size[1], 1],
                            activation_functions=[relu,relu]))
-target_critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, 32, 16, num_actions],
+target_critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions,middle_layer_size[0], middle_layer_size[1], 1],
                            activation_functions=[relu,relu]))
 
-policy.apply(gauss_init(0,.2))
-critic.apply(gauss_init(0,.2))
+policy.apply(gauss_init(0,weight_init_sigma))
+critic.apply(gauss_init(0,weight_init_sigma))
 
 hard_update(target_policy, policy)
 hard_update(target_critic, critic)
@@ -68,26 +74,29 @@ target_agent = ActorCriticAgent(target_policy, target_critic)
 agent = ActorCriticAgent(policy, critic)
 
 
-optimizer_critic = Adam(agent.critic_network.parameters(), lr=critic_learning_rate)
-optimizer_policy = Adam(agent.policy_network.parameters(), lr=actor_learning_rate)
+optimizer_critic = Adam(agent.critic_network.parameters(), lr=critic_learning_rate, weight_decay=0)
+optimizer_policy = Adam(agent.policy_network.parameters(), lr=actor_learning_rate, weight_decay=1e-2)
 critic_criterion = mse_loss
 
 
 # Warmup phase
 state = env.reset()
-for i in tqdm(range(replay_capacity)):
-    action = agent.action(state)
+for i in loop_print("Warmup phase {}/{}",range(warmup)):
+    action = env.action_space.sample()
     state_prev = state
-    state, reward, done, info = env.step(action.cpu().data.numpy())
-    replay_memory.push(state_prev, action, state, reward)
+    state, reward, done, info = env.step(action)
+    replay_memory.append(state_prev, to_tensor(action), reward, done)
 
 env.reset()
 for episode in range(num_episodes):
 
     state = env.reset()
+    random_process.reset()
     acc_reward = 0
+    t_episode_start = time.time()
+    done = False
     for i in range(max_episode_length):
-        env.render()
+        #env.render()
         action = agent.action(state)
 
 ***REMOVED***
@@ -97,49 +106,47 @@ for episode in range(num_episodes):
         state_prev = state
         state, reward, done, info = env.step(action.cpu().data.numpy())
 
-        replay_memory.push(state_prev, action, state, reward)
+        replay_memory.append(state_prev, action, reward, done)
 
         acc_reward += reward
 ***REMOVED***
 
-        batch = replay_memory.sample(batch_size)
-        s1 = np.asarray([x.state for x in batch])
-        s2 = np.asarray([x.next_state for x in batch])
-        a1 = tor.cat([x.action for x in batch])
-        r = to_tensor(np.asarray([x.reward for x in batch]).reshape(-1,1))
-
+        s1, a1, r, s2, terminal = replay_memory.sample_and_split(batch_size)
+        a1 = a1.reshape(-1).tolist()
         # Critic optimization
-        a2 = target_agent.actions(s2).cpu().data.numpy()
+        a2 = target_agent.actions(s2, volatile=True)
 
-        q2 = target_agent.values(s2,a2)
+        q2 = target_agent.values(to_tensor(s2, volatile=True),a2, volatile=False)
+***REMOVED***
 
-        q_expected = r + gamma*q2
-        q_predicted = agent.values(to_tensor(s1),a1.view((-1,1)), requires_grad=True)
+        q_expected = to_tensor(np.asarray(r), volatile=False) + gamma*q2
+        q_predicted = agent.values(to_tensor(s1), tor.cat(a1).view(-1,1), requires_grad=True)
 
+
+        optimizer_critic.zero_grad()
         critic_loss = critic_criterion(q_expected, q_predicted)
 ***REMOVED***
         optimizer_critic.step()
-        optimizer_critic.zero_grad()
-
 ***REMOVED***
 
-        pred_a1 = agent.actions(s1, requires_grad=True).cpu().data.numpy()
-        loss_actor = -1 * tor.mean(agent.values(s1, pred_a1, requires_grad=True))
+        pred_a1 = agent.actions(s1, requires_grad=True)
+        q_input = tor.cat([to_tensor(s1), pred_a1],1)
+        q = agent.values(q_input, requires_grad=True)
+***REMOVED***
+        
+        optimizer_policy.zero_grad()
 ***REMOVED***
         optimizer_policy.step()
-        optimizer_policy.zero_grad()
 
         soft_update(target_agent.policy_network, agent.policy_network, tau)
         soft_update(target_agent.critic_network, agent.critic_network, tau)
 
-    print("Episode", episode, " Accumulated Reward: ", acc_reward)
+        if done:
+            break
 
-    if episode % 100 == 0 and episode != 0:
-        print("#" * 100)
-        print("Episode", episode, ". Average reward: ", np.mean(moving_avg_reward))
-        print("#" * 100)
-
-
+    episode_time = time.time() - t_episode_start
+    prRed("#Training time: {}".format(time.clock()/60))
+    prGreen("#Episode {}. Episode reward: {} Episode steps: {} Episode time: {} min".format(episode, acc_reward, i+1, episode_time/60))
 
 
 
