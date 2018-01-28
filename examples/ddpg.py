@@ -144,7 +144,7 @@ for episode in range(num_episodes):
             break
 
     episode_time = time.time() - t_episode_start
-    prRed("#Training time: {}".format(time.clock()/60))
+    prRed("#Training time: {} minutes".format(time.clock()/60))
     prGreen("#Episode {}. Episode reward: {} Episode steps: {} Episode time: {} min".format(episode, acc_reward, i+1, episode_time/60))
 
 
