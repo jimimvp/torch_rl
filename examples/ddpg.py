@@ -19,7 +19,7 @@ import itertools
 def random_process_action_choice(random_process):
 
     def func(actor_output, epsilon):
-        action = actor_output + to_tensor(epsilon*random_process())
+        action = actor_output + epsilon*random_process()
         return action
     return func
 
@@ -85,7 +85,7 @@ for i in loop_print("Warmup phase {}/{}",range(warmup)):
     action = env.action_space.sample()
     state_prev = state
     state, reward, done, info = env.step(action)
-    replay_memory.append(state_prev, to_tensor(action), reward, done)
+    replay_memory.append(state_prev, action, reward, done)
 
 env.reset()
 for episode in range(num_episodes):
@@ -97,14 +97,14 @@ for episode in range(num_episodes):
     done = False
     for i in range(max_episode_length):
         #env.render()
-        action = agent.action(state)
+        action = agent.action(state).cpu().data.numpy()
 
         # Choose action with exploration
         action = action_choice_function(action, epsilon)
         epsilon-=depsilon
 
         state_prev = state
-        state, reward, done, info = env.step(action.cpu().data.numpy())
+        state, reward, done, info = env.step(action)
 
         replay_memory.append(state_prev, action, reward, done)
 
@@ -112,7 +112,6 @@ for episode in range(num_episodes):
         # Optimize over batch
 
         s1, a1, r, s2, terminal = replay_memory.sample_and_split(batch_size)
-        a1 = a1.reshape(-1).tolist()
         # Critic optimization
         a2 = target_agent.actions(s2, volatile=True)
 
@@ -120,7 +119,7 @@ for episode in range(num_episodes):
         q2.volatile = False
 
         q_expected = to_tensor(np.asarray(r), volatile=False) + gamma*q2
-        q_predicted = agent.values(to_tensor(s1), tor.cat(a1).view(-1,1), requires_grad=True)
+        q_predicted = agent.values(to_tensor(s1), to_tensor(a1), requires_grad=True)
 
 
         optimizer_critic.zero_grad()
@@ -129,8 +128,8 @@ for episode in range(num_episodes):
         optimizer_critic.step()
         # Actor optimization
 
-        pred_a1 = agent.actions(s1, requires_grad=True)
-        q_input = tor.cat([to_tensor(s1), pred_a1],1)
+        a1 = agent.actions(s1, requires_grad=True)
+        q_input = tor.cat([to_tensor(s1), a1],1)
         q = agent.values(q_input, requires_grad=True)
         loss_actor = -q.mean()
         
