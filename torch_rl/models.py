@@ -158,9 +158,10 @@ class Reservoir(SpikingNetwork):
         if tor.is_tensor(x):
             x = x.data.numpy()
         if len(x.shape) >= 2 and x.shape[0] > 1:
-            return self.batch_forward(x)
-        else:
-            x = x.reshape(-1)
+            if x.shape[1] != 1 and x.shape[0] != 1:
+                return self.batch_forward(x)
+
+        x = x.reshape(-1)
         self.input_node.output = x
         self.sim.run_steps(self.dt_steps, progress_bar=False)
 
