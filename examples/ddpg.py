@@ -6,7 +6,7 @@ import time
 
 from torch_rl.models import SimpleNetwork
 from torch_rl.core import ActorCriticAgent
-from torch_rl.envs import NormalisedActions
+from torch_rl.envs import NormalisedActionsWrapper
 from collections import deque
 from torch_rl.utils import gauss_weights_init
 from torch_rl.memory import SequentialMemory
@@ -46,7 +46,7 @@ weight_init_sigma = 0.003
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
 
-env = NormalisedActions(gym.make("Pendulum-v0"))
+env = NormalisedActionsWrapper(gym.make("Pendulum-v0"))
 env.reset()
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]
@@ -144,9 +144,8 @@ for episode in range(num_episodes):
             break
 
     episode_time = time.time() - t_episode_start
-    prRed("#Training time: {} minutes".format(time.clock()/60))
-    prGreen("#Episode {}. Episode reward: {} Episode steps: {} Episode time: {} min".format(episode, acc_reward, i+1, episode_time/60))
-
+    prRed("#Training time: {:.2f} minutes".format(time.clock()/60))
+    prGreen("#Episode {}. Episode reward: {:.2f} Episode steps: {} Episode time: {:.2f} min".format(episode, acc_reward, i+1, episode_time/60))
 
 
 
