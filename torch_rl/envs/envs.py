@@ -2,6 +2,8 @@ import numpy as np
 import gym
 from gym import spaces
 from gym.utils import seeding
+from gym.envs.classic_control.pendulum import  PendulumEnv
+
 
 class BitFlippingEnv(object):
 
@@ -34,7 +36,7 @@ class BitFlippingEnv(object):
 
 
 
-class NormalisedActions(gym.ActionWrapper):
+class NormalisedActionsWrapper(gym.ActionWrapper):
 
     def _action(self, action):
         action = (action + 1) / 2  # [-1, 1] => [0, 1]
@@ -84,4 +86,15 @@ class BanditEnv(gym.Env):
     def _get_obs(self):
         return self.state
 
+
+
+
+
+class SameStartStateWrapper(gym.Wrapper):
+
+
+    def reset(self):
+        self.env.reset()
+        self.env.state = (self.env.observation_space.high + self.env.observation_space.low) / 2.
+        return self.env.state
 
