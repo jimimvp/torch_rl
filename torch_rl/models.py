@@ -133,7 +133,7 @@ class Reservoir(SpikingNetwork):
 
             if recursive:
                 # l2 = nengo.Ensemble(200, dimensions=observation_size)
-                W = np.random.uniform(-0.2, 0.2, (state_ensemble.n_neurons, state_ensemble.n_neurons))
+                W = np.random.uniform(-1, 1, (state_ensemble.n_neurons, state_ensemble.n_neurons))
                 eig, eigv = np.linalg.eig(W)
                 W = W / np.max(np.abs(eig)) * spectral_radius
 
@@ -144,7 +144,7 @@ class Reservoir(SpikingNetwork):
             """
                 Connect input to ensemble.
             """
-            nengo.Connection(self.input_node, state_ensemble.neurons, transform=np.random.normal(0.,0.02,(network_size,input_size)))
+            nengo.Connection(self.input_node, state_ensemble.neurons, transform=np.random.uniform(-1,1,(network_size,input_size)))
 
 
             """
@@ -166,11 +166,11 @@ class Reservoir(SpikingNetwork):
         self.state = x
         self.sim.run_steps(self.dt_steps, progress_bar=False)
 
-        out = self.sim.data[self.output_probe]
+        out = self.sim.data[self.output_probe]/100 - 0.5
         """
             Take the average of all steps as output.
         """
-        out = np.mean(out[-self.dt_steps:-1], axis=0)
+        out = np.mean(out[-self.dt_steps:], axis=0)
         out = out.reshape(1, -1)
         return out
 
@@ -182,7 +182,8 @@ class Reservoir(SpikingNetwork):
         return np.vstack(out)
 
     def reset(self):
-        self.sim.reset()
+        self.sim.close()
+        self.sim = nengo.Simulator(network=self.model, dt=self.sim_dt)
 
 
 
