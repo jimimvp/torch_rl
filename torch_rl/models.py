@@ -118,17 +118,18 @@ class Reservoir(SpikingNetwork):
     def __init__(self,dt, sim_dt, input_size, network_size=800, recursive=False, spectral_radius=1., noise=False):
         super(Reservoir, self).__init__(dt, sim_dt)
         self.model = nengo.Network(seed=60)
+        self.state = np.zeros(input_size)
         with self.model as model:
             """
                 Network configurations.
             """
-            self.input_node = nengo.Node(np.zeros(input_size))
+            self.input_node = nengo.Node(lambda t: self.state)
             # Noise
             if noise:
                 noise = nengo.processes.WhiteNoise(dist=nengo.dists.Gaussian(0,0.5),default_size_out=input_size)
 
             # If specified create reservoir for the state
-            state_ensemble = nengo.Ensemble(network_size, dimensions=input_size)
+            state_ensemble = nengo.Ensemble(network_size, dimensions=input_size, radius=8.)
 
             if recursive:
                 # l2 = nengo.Ensemble(200, dimensions=observation_size)
@@ -143,7 +144,7 @@ class Reservoir(SpikingNetwork):
             """
                 Connect input to ensemble.
             """
-            nengo.Connection(self.input_node, state_ensemble.neurons, transform=np.random.normal(0.1,0.2,(network_size,input_size)))
+            nengo.Connection(self.input_node, state_ensemble.neurons, transform=np.random.normal(0.,0.02,(network_size,input_size)))
 
 
             """
@@ -162,7 +163,7 @@ class Reservoir(SpikingNetwork):
                 return self.batch_forward(x)
 
         x = x.reshape(-1)
-        self.input_node.output = x
+        self.state = x
         self.sim.run_steps(self.dt_steps, progress_bar=False)
 
         out = self.sim.data[self.output_probe]
