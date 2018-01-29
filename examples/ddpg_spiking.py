@@ -40,14 +40,14 @@ actor_learning_rate = 1e-4
 critic_learning_rate = 1e-3
 middle_layer_size = [400,300]
 weight_init_sigma = 0.003
-reservoir_size = 200
+reservoir_size = 50
 
 
 
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
 
-env = SameStartStateWrapper(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+env = NormalisedActionsWrapper(gym.make("Pendulum-v0"))
 env.reset()
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]
@@ -73,7 +73,7 @@ hard_update(target_critic, critic)
 
 target_agent = ActorCriticAgent(target_policy, target_critic)
 agent = ActorCriticAgent(policy, critic)
-spiking_net = Reservoir(0.1, 0.01,num_observations,reservoir_size)
+spiking_net = Reservoir(0.1, 0.01,num_observations,reservoir_size, spectral_radius=0.9)
 
 optimizer_critic = Adam(agent.critic_network.parameters(), lr=critic_learning_rate, weight_decay=0)
 optimizer_policy = Adam(agent.policy_network.parameters(), lr=actor_learning_rate, weight_decay=1e-2)
@@ -98,7 +98,7 @@ for episode in range(num_episodes):
     done = False
     spiking_net.reset()
     for i in range(max_episode_length):
-        env.render()
+        #env.render()
 
         state = spiking_net.forward(state).reshape(-1)
 
