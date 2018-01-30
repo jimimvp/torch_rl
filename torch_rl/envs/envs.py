@@ -51,6 +51,16 @@ class NormalisedActionsWrapper(gym.ActionWrapper):
         return action
 
 
+class NormalisedObservationsWrapper(gym.ObservationWrapper):
+
+    def _observation(self, observation):
+        observation -= self.observation_space.low
+        observation /= (self.observation_space.high - self.observation_space.low)
+        observation = observation*2-1
+        return observation
+
+
+
 class BanditEnv(gym.Env):
 
     def __init__(self, num_bandits):
