@@ -1,16 +1,14 @@
 import gym
 from torch.optim import Adam
 from torch_rl.utils import *
-from tqdm import tqdm
 import time
 
 from torch_rl.models import SimpleNetwork, Reservoir
 from torch_rl.core import ActorCriticAgent
-from torch_rl.envs import NormalisedActionsWrapper, SameStartStateWrapper
-from collections import deque
+from torch_rl.envs import NormalisedActionsWrapper
 from torch_rl.utils import gauss_weights_init
 from torch_rl.memory import SequentialMemory
-import itertools
+from torch_rl.stats import RLTrainingStats
 """
     Implementation of deep deterministic policy gradients with soft updates.
 
@@ -28,7 +26,7 @@ def mse_loss(input, target):
 
 # Training parameters
 num_episodes = 80000
-batch_size = 64
+batch_size = 128
 tau = 0.001
 epsilon = 1.0
 depsilon = 1./50000
@@ -73,11 +71,14 @@ hard_update(target_critic, critic)
 
 target_agent = ActorCriticAgent(target_policy, target_critic)
 agent = ActorCriticAgent(policy, critic)
-spiking_net = Reservoir(0.1, 0.01,num_observations,reservoir_size, spectral_radius=0.9, recursive=True)
+spiking_net = Reservoir(0.1, 0.01,num_observations,reservoir_size, spectral_radius=0.9, recursive=False)
 
 optimizer_critic = Adam(agent.critic_network.parameters(), lr=critic_learning_rate, weight_decay=0)
 optimizer_policy = Adam(agent.policy_network.parameters(), lr=actor_learning_rate, weight_decay=1e-2)
 critic_criterion = mse_loss
+
+stats = RLTrainingStats(save_rate=30,
+                        save_destination='/disk/no_backup/vlasteli/Projects/torch_rl/training_stats/ddpg_spiking')
 
 
 # Warmup phase
@@ -148,6 +149,8 @@ for episode in range(num_episodes):
         if done:
             break
 
+    stats.episode_step(episode, acc_reward, loss_actor=loss_actor.cpu().data.numpy()[0],
+                       loss_critic=critic_loss.cpu().data.numpy()[0])
     episode_time = time.time() - t_episode_start
     prRed("#Training time: {:.2f} minutes".format(time.clock()/60))
     prGreen("#Episode {}. Episode reward: {:.2f} Episode steps: {} Episode time: {:.2f} min".format(episode, acc_reward, i+1, episode_time/60))
