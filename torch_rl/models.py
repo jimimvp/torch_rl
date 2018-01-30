@@ -129,7 +129,7 @@ class Reservoir(SpikingNetwork):
                 noise = nengo.processes.WhiteNoise(dist=nengo.dists.Gaussian(0,0.5),default_size_out=input_size)
 
             # If specified create reservoir for the state
-            state_ensemble = nengo.Ensemble(network_size, dimensions=input_size, radius=8.)
+            state_ensemble = nengo.Ensemble(network_size, neuron_type=nengo.LIF(), dimensions=input_size, radius=1.2)
 
             if recursive:
                 # l2 = nengo.Ensemble(200, dimensions=observation_size)
@@ -139,7 +139,7 @@ class Reservoir(SpikingNetwork):
 
                 print('Spectral radius of reservoir weights: ', spectral_radius)
 
-                nengo.Connection(state_ensemble.neurons, state_ensemble.neurons, transform=W)
+                nengo.Connection(state_ensemble.neurons, state_ensemble.neurons, transform=W, synapse=0.1)
 
             """
                 Connect input to ensemble.
