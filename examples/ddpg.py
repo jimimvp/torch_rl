@@ -1,16 +1,13 @@
 import gym
 from torch.optim import Adam
 from torch_rl.utils import *
-from tqdm import tqdm
 import time
 
 from torch_rl.models import SimpleNetwork
 from torch_rl.core import ActorCriticAgent
 from torch_rl.envs import NormalisedActionsWrapper
-from collections import deque
-from torch_rl.utils import gauss_weights_init
 from torch_rl.memory import SequentialMemory
-import itertools
+from torch_rl.stats import RLTrainingStats
 """
     Implementation of deep deterministic policy gradients with soft updates.
 
@@ -77,7 +74,7 @@ agent = ActorCriticAgent(policy, critic)
 optimizer_critic = Adam(agent.critic_network.parameters(), lr=critic_learning_rate, weight_decay=0)
 optimizer_policy = Adam(agent.policy_network.parameters(), lr=actor_learning_rate, weight_decay=1e-2)
 critic_criterion = mse_loss
-
+stats = RLTrainingStats()
 
 # Warmup phase
 state = env.reset()
@@ -142,6 +139,8 @@ for episode in range(num_episodes):
 
         if done:
             break
+
+    stats.episode_step(episode, acc_reward)
 
     episode_time = time.time() - t_episode_start
     prRed("#Training time: {:.2f} minutes".format(time.clock()/60))
