@@ -3,7 +3,8 @@
 *.model
 *.output
 *.stats
-
+*.pandas
+*training_stats*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
