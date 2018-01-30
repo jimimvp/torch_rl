@@ -38,9 +38,9 @@ warmup = 100
 max_episode_length = 500
 actor_learning_rate = 1e-4
 critic_learning_rate = 1e-3
-middle_layer_size = [400,300]
+middle_layer_size = [600,400]
 weight_init_sigma = 0.003
-reservoir_size = 50
+reservoir_size = 200
 
 
 
@@ -73,7 +73,7 @@ hard_update(target_critic, critic)
 
 target_agent = ActorCriticAgent(target_policy, target_critic)
 agent = ActorCriticAgent(policy, critic)
-spiking_net = Reservoir(0.1, 0.01,num_observations,reservoir_size, spectral_radius=0.9)
+spiking_net = Reservoir(0.1, 0.01,num_observations,reservoir_size, spectral_radius=0.9, recursive=True)
 
 optimizer_critic = Adam(agent.critic_network.parameters(), lr=critic_learning_rate, weight_decay=0)
 optimizer_policy = Adam(agent.policy_network.parameters(), lr=actor_learning_rate, weight_decay=1e-2)
