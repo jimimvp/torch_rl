@@ -26,7 +26,7 @@ class RLTrainingStats(object):
         if save_destination is None:
             self.save_destination = 'training_stats_' + str(datetime.datetime.now())
 ***REMOVED***
-            self.save_destination = self.save_destination
+            self.save_destination = save_destination
 
         # Pandas data frames
         self.episode_data = None
@@ -72,7 +72,6 @@ class RLTrainingStats(object):
         if not os.path.isdir(path):
             os.makedirs(path)
         if not self.episode_data is None:
-            print(self.episode_data)
             name = time_stamp + "_episode.stats"
             self.episode_data.to_pickle(os.path.join(path, name))
         if not self.step_data is None:
