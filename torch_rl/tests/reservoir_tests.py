@@ -5,7 +5,7 @@ import numpy as np
 
 env = gym.make("Pendulum-v0")
 state = env.reset()
-reservoir = Reservoir(0.4, 0.01, spectral_radius=0.9, network_size=200, input_size=env.observation_space.shape[0], recursive=True)
+reservoir = Reservoir(0.1, 0.005, spectral_radius=0.3, network_size=200, input_size=env.observation_space.shape[0], recursive=True)
 
 state_prev = np.zeros(200)
 
