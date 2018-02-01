@@ -6,7 +6,6 @@ import time
 from torch_rl.models import SimpleNetwork, Reservoir
 from torch_rl.core import ActorCriticAgent
 from torch_rl.envs import NormalisedActionsWrapper, NormalisedObservationsWrapper
-from torch_rl.utils import gauss_weights_init
 from torch_rl.memory import SequentialMemory
 from torch_rl.stats import RLTrainingStats
 """
@@ -40,8 +39,6 @@ middle_layer_size = [600,400,200]
 weight_init_sigma = 0.003
 reservoir_size = 200
 
-
-
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
 
@@ -56,9 +53,9 @@ action_choice_function = random_process_action_choice(random_process)
 
 policy = cuda_if_available(SimpleNetwork([reservoir_size, middle_layer_size[0], middle_layer_size[1], num_actions],
                            activation_functions=[relu,relu,tanh]))
-target_policy =  cuda_if_available(SimpleNetwork([reservoir_size, middle_layer_size[0], middle_layer_size[1], num_actions],
+target_policy = cuda_if_available(SimpleNetwork([reservoir_size, middle_layer_size[0], middle_layer_size[1], num_actions],
                            activation_functions=[relu,relu,tanh ]))
-critic =  cuda_if_available(SimpleNetwork([reservoir_size+num_actions, middle_layer_size[0], middle_layer_size[1], 1],
+critic = cuda_if_available(SimpleNetwork([reservoir_size+num_actions, middle_layer_size[0], middle_layer_size[1], 1],
                            activation_functions=[relu,relu]))
 target_critic =  cuda_if_available(SimpleNetwork([reservoir_size+num_actions,middle_layer_size[0], middle_layer_size[1], 1],
                            activation_functions=[relu,relu]))
@@ -78,7 +75,7 @@ optimizer_policy = Adam(agent.policy_network.parameters(), lr=actor_learning_rat
 critic_criterion = mse_loss
 
 stats = RLTrainingStats(save_rate=30,
-                        save_destination='/disk/no_backup/vlasteli/Projects/torch_rl/training_stats/ddpg_spiking_recursive_lif_normalised_larger')
+                        save_destination='/disk/no_backup/vlasteli/Projects/torch_rl/training_stats/ddpg_spiking_tanh_reservoir')
 
 
 # Warmup phase
@@ -99,7 +96,7 @@ for episode in range(num_episodes):
     done = False
     spiking_net.reset()
     for i in range(max_episode_length):
-        env.render()
+        #env.render()
 
         state = spiking_net.forward(state).reshape(-1)
 
