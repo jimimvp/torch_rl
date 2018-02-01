@@ -3,9 +3,7 @@ from torch_rl.models import Reservoir
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from nengolib.neurons import  Tanh
-import nengo
-
+from nengolib.neurons import Tanh
 
 steps = 1000
 spectral_radius = 0.8
