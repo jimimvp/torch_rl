@@ -115,7 +115,8 @@ import nengo
 class Reservoir(SpikingNetwork):
 
 
-    def __init__(self,dt, sim_dt, input_size, network_size=800, recursive=False, spectral_radius=1., noise=False):
+    def __init__(self,dt, sim_dt, input_size, network_size=800, recursive=False,
+                 spectral_radius=1.,neuron_type= nengo.LIF(),noise=False, synapse_filter=15e-4):
         super(Reservoir, self).__init__(dt, sim_dt)
         self.model = nengo.Network(seed=60)
         self.state = np.zeros(input_size)
@@ -129,22 +130,23 @@ class Reservoir(SpikingNetwork):
                 noise = nengo.processes.WhiteNoise(dist=nengo.dists.Gaussian(0,0.5),default_size_out=input_size)
 
             # If specified create reservoir for the state
-            state_ensemble = nengo.Ensemble(network_size, neuron_type=nengo.LIF(), dimensions=input_size, radius=1.2)
+            state_ensemble = nengo.Ensemble(network_size, neuron_type=neuron_type, dimensions=input_size, radius=1.2)
 
             if recursive:
                 # l2 = nengo.Ensemble(200, dimensions=observation_size)
-                W = np.random.uniform(-1, 1, (state_ensemble.n_neurons, state_ensemble.n_neurons))
+                W = np.random.uniform(-0.5, 0.5, (state_ensemble.n_neurons, state_ensemble.n_neurons))
                 eig, eigv = np.linalg.eig(W)
                 W = W / np.max(np.abs(eig)) * spectral_radius
 
                 print('Spectral radius of reservoir weights: ', spectral_radius)
 
-                nengo.Connection(state_ensemble.neurons, state_ensemble.neurons, transform=W, synapse=0.1)
+                nengo.Connection(state_ensemble.neurons, state_ensemble.neurons, transform=W, synapse=synapse_filter)
 
             """
                 Connect input to ensemble.
             """
-            nengo.Connection(self.input_node, state_ensemble.neurons, transform=np.random.uniform(-1,1,(network_size,input_size)))
+            nengo.Connection(self.input_node, state_ensemble.neurons,
+                             transform=np.random.uniform(-0.5,0.5,(network_size,input_size)), synapse=None)
 
 
             """
@@ -166,7 +168,7 @@ class Reservoir(SpikingNetwork):
         self.state = x
         self.sim.run_steps(self.dt_steps, progress_bar=False)
 
-        out = self.sim.data[self.output_probe]/100 - 0.5
+        out = self.sim.data[self.output_probe]
         """
             Take the average of all steps as output.
         """
