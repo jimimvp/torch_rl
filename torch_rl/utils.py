@@ -3,6 +3,8 @@ from torch.autograd import Variable
 import numpy as np
 import random
 from collections import namedtuple, deque
+import os
+
 
 
 def to_tensor(ndarray, volatile=False, requires_grad=False, dtype=tor.FloatTensor, cuda=True):
@@ -15,8 +17,12 @@ def to_tensor(ndarray, volatile=False, requires_grad=False, dtype=tor.FloatTenso
     ).type(dtype)
 
 def cuda_if_available(model):
-    if tor.cuda.device_count() > 0:
-        return model.cuda()
+    if tor.cuda.is_available():
+        try:
+            return model.cuda()
+        except Exception as e:
+             #prRed("GPU memory allocation failed, using CPU.")
+            return model
     else:
         return model
 
@@ -95,6 +101,8 @@ def loop_print(prt, r):
     for i in r:
         print("\r\033[96m {}\033[00m".format(prt.format(i+1, len(r))), end="", flush=True)
         yield i
+
+
 
 
 
