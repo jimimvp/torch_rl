@@ -109,14 +109,16 @@ class PolicySPG(StochasticPolicy):
         self.out = out
         return out
 
-
-
 import nengo
+from nengolib.neurons import Tanh
+
 class Reservoir(SpikingNetwork):
 
 
     def __init__(self,dt, sim_dt, input_size, network_size=800, recursive=False,
-                 spectral_radius=1.,neuron_type= nengo.LIF(),noise=False, synapse_filter=15e-4):
+                 spectral_radius=1.,neuron_type=Tanh(),noise=False, synapse_filter=15e-4):
+
+
         super(Reservoir, self).__init__(dt, sim_dt)
         self.model = nengo.Network(seed=60)
         self.state = np.zeros(input_size)
