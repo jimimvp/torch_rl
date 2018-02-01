@@ -5,7 +5,7 @@ import time
 
 from torch_rl.models import SimpleNetwork, Reservoir
 from torch_rl.core import ActorCriticAgent
-from torch_rl.envs import NormalisedActionsWrapper
+from torch_rl.envs import NormalisedActionsWrapper, NormalisedObservationsWrapper
 from torch_rl.utils import gauss_weights_init
 from torch_rl.memory import SequentialMemory
 from torch_rl.stats import RLTrainingStats
@@ -32,11 +32,11 @@ epsilon = 1.0
 depsilon = 1./50000
 gamma = 0.99
 replay_capacity = 1000000
-warmup = 100
+warmup = 2000
 max_episode_length = 500
 actor_learning_rate = 1e-4
 critic_learning_rate = 1e-3
-middle_layer_size = [600,400]
+middle_layer_size = [600,400,200]
 weight_init_sigma = 0.003
 reservoir_size = 200
 
@@ -45,7 +45,7 @@ reservoir_size = 200
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
 
-env = NormalisedActionsWrapper(gym.make("Pendulum-v0"))
+env = NormalisedObservationsWrapper(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
 env.reset()
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]
@@ -71,14 +71,14 @@ hard_update(target_critic, critic)
 
 target_agent = ActorCriticAgent(target_policy, target_critic)
 agent = ActorCriticAgent(policy, critic)
-spiking_net = Reservoir(0.1, 0.01,num_observations,reservoir_size, spectral_radius=0.9, recursive=False)
+spiking_net = Reservoir(0.1, 0.01,num_observations,reservoir_size, spectral_radius=0.9, recursive=True)
 
 optimizer_critic = Adam(agent.critic_network.parameters(), lr=critic_learning_rate, weight_decay=0)
 optimizer_policy = Adam(agent.policy_network.parameters(), lr=actor_learning_rate, weight_decay=1e-2)
 critic_criterion = mse_loss
 
 stats = RLTrainingStats(save_rate=30,
-                        save_destination='/disk/no_backup/vlasteli/Projects/torch_rl/training_stats/ddpg_spiking')
+                        save_destination='/disk/no_backup/vlasteli/Projects/torch_rl/training_stats/ddpg_spiking_recursive_lif_normalised_larger')
 
 
 # Warmup phase
@@ -99,7 +99,7 @@ for episode in range(num_episodes):
     done = False
     spiking_net.reset()
     for i in range(max_episode_length):
-        #env.render()
+        env.render()
 
         state = spiking_net.forward(state).reshape(-1)
 
