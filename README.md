@@ -1,6 +1,6 @@
-# ArtificialIntelligenceAlgorithms
+# torch_rl
 
-Different algorithms relevant to development of AI.
+Reinforcement learning algorithms for spiking networks and artificial neural networks.
 
 ## Currently implemented
 
