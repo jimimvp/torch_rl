@@ -48,6 +48,10 @@ class RingBuffer(object):
             raise KeyError()
         return self.data[(self.start + idx) % self.maxlen]
 
+    @property
+    def last_idx(self):
+        return (self.length-1 + self.start)%self.maxlen
+
     def append(self, v):
         if self.length < self.maxlen:
             # We have space, simply increase the length.
@@ -59,6 +63,14 @@ class RingBuffer(object):
             # This should never happen.
             raise RuntimeError()
         self.data[(self.start + self.length - 1) % self.maxlen] = v
+
+
+    def pop(self, size):
+        if self.start >= size:
+            self.start -= size
+***REMOVED***
+            self.length + self.start - size
+            self.start = 0
 
 
 def zeroed_observation(observation):
@@ -225,6 +237,103 @@ class SequentialMemory(Memory):
         return config
 
 
+
+class HindsightMemory(Memory):
+    """
+        Implementation of replay memory for hindsight experience replay with future
+        transition sampling.
+    """
+
+    def __init__(self, limit, hindsight_size=8, reward_function=lambda observation,goal: 1, **kwargs):
+        super(HindsightMemory, self).__init__(**kwargs)
+        self.hindsight_size = hindsight_size
+        self.reward_function = reward_function
+        self.hindsight_buffer = RingBuffer(limit)
+        self.goals = RingBuffer(limit)
+        self.actions = RingBuffer(limit)
+        self.rewards = RingBuffer(limit)
+        self.terminals = RingBuffer(limit)
+        self.observations = RingBuffer(limit)
+
+        self.limit = limit
+        self.last_terminal_idx = 0
+
+    def append(self, observation, goal, action, reward, terminal, training=True):
+        if training:
+            self.observations.append(observation)
+            self.actions.append(action)
+            self.rewards.append(reward)
+            self.terminals.append(terminal)
+            self.goals.append(goal)
+            if terminal:
+                """
+                Sample hindsight_size of states added from recent terminal state to this one.
+                """
+                self.add_hindsight()
+                self.pop()
+                self.last_terminal_idx = self.goals.last_idx
+
+            super(HindsightMemory, self).append(observation, action, reward, terminal, training=True)
+
+    def pop(self):
+        """
+        Remove last hindsight_size of elements because they were not
+        used to generate hindsight.
+        """
+        self.observations.pop(self.hindsight_size)
+        self.actions.pop(self.hindsight_size)
+        self.goals.pop(self.hindsight_size)
+        self.terminals.pop(self.hindsight_size)
+        self.rewards.pop(self.hindsight_size)
+
+    def add_hindsight(self):
+        for i in range(self.last_terminal_idx, self.observations.last_idx):
+            # For every state in episode sample hindsight_size from future states
+            hindsight_idx = sample_batch_indexes(i, self.observations.last_idx, self.hindsight_size)
+            hindsight_experience = [None] * self.hindsight_size
+            for j,idx in enumerate(hindsight_idx):
+                hindsight_experience[j] = idx
+            self.hindsight_buffer.append(hindsight_experience)
+
+    def sample_and_split(self, batch_size, batch_idxs=None):
+        num_transitions = int(batch_size / self.hindsight_size)
+        batch_idxs = sample_batch_indexes(0, self.hindsight_buffer.length-1, size=num_transitions)
+
+        state0_batch = []
+        reward_batch = []
+        goal_batch = []
+        action_batch = []
+        terminal1_batch = []
+        state1_batch = []
+        for idx in batch_idxs:
+            idx %= self.limit
+            state0_batch.append(self.observations[idx])
+            state1_batch.append(self.observations[idx+1])
+            reward_batch.append(self.rewards[idx])
+            action_batch.append(self.actions[idx])
+            goal_batch.append(self.goals[idx])
+            # Add hindsight experience to batch
+            for hindsight_idx in self.hindsight_buffer[idx]:
+                state0_batch.append(self.observations[hindsight_idx])
+                state1_batch.append(self.observations[hindsight_idx+1])
+                reward_batch.append(self.rewards[hindsight_idx])
+                action_batch.append(self.actions[hindsight_idx])
+                goal_batch.append(self.observations[hindsight_idx+1])
+        # Prepare and validate parameters.
+        state0_batch = np.array(state0_batch).reshape(batch_size,-1)
+        state1_batch = np.array(state1_batch).reshape(batch_size,-1)
+        terminal1_batch = np.array(terminal1_batch).reshape(batch_size,-1)
+        reward_batch = np.array(reward_batch).reshape(batch_size,-1)
+        action_batch = np.array(action_batch).reshape(batch_size,-1)
+
+        return state0_batch, goal_batch, action_batch, reward_batch, state1_batch, terminal1_batch
+
+
+    @property
+    def nb_entries(self):
+        return len(self.observations)
+
+
 class EpisodeParameterMemory(Memory):
     def __init__(self, limit, **kwargs):
         super(EpisodeParameterMemory, self).__init__(**kwargs)
@@ -265,3 +374,5 @@ class EpisodeParameterMemory(Memory):
         config = super(SequentialMemory, self).get_config()
         config['limit'] = self.limit
         return config
+
+
