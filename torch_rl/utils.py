@@ -129,18 +129,14 @@ class OrnsteinUhlenbeckActionNoise:
         return self.sample()
 
 
-class ReplayMemory(object):
-    def __init__(self, capacity):
-        self.memory = deque(maxlen=capacity)
 
-    def push(self, *args):
-        """Saves a transition."""
-        self.memory.append(Transition(*args))
 
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+class Parameters(object):
 
-    def __len__(self):
-        return len(self.memory)
+    def __init__(self):
+        super(Parameters, self).__init__()
 
-#TODO Implement Hindsight Replay Memory
+    def to_named_tuple(self):
+        d = self.__dict__
+        return namedtuple('Parameters', d.keys())(**self.__dict__)
+
