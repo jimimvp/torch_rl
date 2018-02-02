@@ -114,4 +114,13 @@ class RLTrainingStats(object):
             for f in files[1:]:
                 d = pd.read_pickle(os.path.join(path, f))
                 data = pd.concat([data, d])
+
+        return data
+
+    @staticmethod
+    def load_hyperparameters(path="./training_stats"):
+        files = glob.glob(path + "/*.cfg")
+        files = sorted(files)
+        data = pd.read_pickle(os.path.join(path, files[0]))
+
         return data
