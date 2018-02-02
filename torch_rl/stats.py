@@ -5,6 +5,7 @@ import os
 import numpy as np
 from torch_rl.utils import Parameters, prRed
 import glob
+import shutil
 
 class RLTrainingStats(object):
     """
@@ -30,16 +31,15 @@ class RLTrainingStats(object):
 ***REMOVED***
             self.save_destination = save_destination
 
-        if not os.path.isdir(self.save_destination):
-            os.makedirs(self.save_destination)
-***REMOVED***
+        if os.path.isdir(self.save_destination):
             prRed(self.save_destination + " is a directory already, delete for new training data? y/n")
             res = input()
             res = res.lower()
             if res == 'y':
-                os.rmdir(self.save_destination)
+                shutil.rmtree(self.save_destination)
     ***REMOVED***
                 raise Exception("Start training with another save destination name.")
+        os.makedirs(self.save_destination)
 
 
         # Save hyperparameters to a file
