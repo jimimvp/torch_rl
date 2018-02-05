@@ -40,8 +40,8 @@ class HindsightReplayTest(TestCase):
             self.assertTrue(not hindsight is None, "If you can iterate over it, should not be None")
             self.assertTrue(len(hindsight) == 8, "Length of every hindsight entry should be 8")
             # Check that all of the idxs belong to the same episode
-            episode = self.memory.observations[hindsight[0]]
-            for i in hindsight[1:]:
+            episode = self.memory.observations[hindsight[0][0]]
+            for i,root_idx in hindsight[1:]:
                 e = self.memory.observations[i]
                 print(episode, e)
                 self.assertTrue(self.memory.observations[i] == episode, "Every experience in hindsight should be from same episode")
@@ -49,7 +49,7 @@ class HindsightReplayTest(TestCase):
 
     def test_hindsight_pairing(self):
         for hindsight in self.memory.hindsight_buffer:
-            for i in hindsight:
+            for i, root_idx in hindsight:
                 e = self.memory[i]
                 [self.assertTrue(nnone(obj), "Every object in experience should not be None") for obj in e]
 
