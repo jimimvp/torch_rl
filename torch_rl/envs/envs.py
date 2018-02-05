@@ -13,14 +13,14 @@ class BitFlippingEnv(object):
         self.state = np.zeros(num_bits, dtype=np.uint8)
         # Maybe too hard?
         self.goal = np.random.choice([0,1], num_bits).astype(np.uint8)
-
+        self.done = False
 
     def step(self, action):
         if action < self.state.size:
             self.state[action] ^= 1
-        self.done = np.array_equal(self.state, self.goal)
+        reward = np.array_equal(self.state, self.goal)
 
-        return self.state, int(self.done), self.done, {}
+        return self.state, int(reward), self.done, {}
 
     def reset(self):
         self.goal = np.random.choice([0,1], self.num_bits)
