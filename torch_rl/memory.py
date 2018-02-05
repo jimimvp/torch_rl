@@ -72,6 +72,15 @@ class RingBuffer(object):
             self.length + self.start - size
             self.start = 0
 
+    def __iter__(self):
+        for i in range(self.start, self.length):
+            yield self[i]
+
+        if self.start > 0:
+            for i in range(0, self.start):
+                yield self[i]
+
+
 
 def zeroed_observation(observation):
     if hasattr(observation, 'shape'):
@@ -275,6 +284,12 @@ class HindsightMemory(Memory):
 
             super(HindsightMemory, self).append(observation, action, reward, terminal, training=True)
 
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= self.nb_entries:
+            raise KeyError()
+        return self.observations[idx], self.goals[idx], self.actions[idx], self.rewards[idx], self.terminals[idx]
+
+
     def pop(self):
         """
         Remove last hindsight_size of elements because they were not
@@ -287,7 +302,7 @@ class HindsightMemory(Memory):
         self.rewards.pop(self.hindsight_size)
 
     def add_hindsight(self):
-        for i in range(self.last_terminal_idx, self.observations.last_idx):
+        for i in range(self.last_terminal_idx+1, self.observations.last_idx):
             # For every state in episode sample hindsight_size from future states
             hindsight_idx = sample_batch_indexes(i, self.observations.last_idx, self.hindsight_size)
             hindsight_experience = [None] * self.hindsight_size
