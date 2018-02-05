@@ -20,10 +20,9 @@ class StochasticPolicy(Policy):
         super(StochasticPolicy, self).__init__()
 
     def sample_action(self, action_distribution=None):
-
         if not action_distribution:
-            action_distribution = self.out[0]
-        action_distribution = action_distribution.data.numpy()
+            action_distribution = self.out
+        action_distribution = action_distribution.cpu().data.numpy()
         action = np.random.choice(action_distribution, p=action_distribution)
         action = np.argmax(action_distribution == action)
         return action
@@ -96,8 +95,8 @@ class PolicySPG(StochasticPolicy):
     def __init__(self,  input_size, output_size):
         super(PolicySPG, self).__init__()
 
-        self.f1 = nn.Linear(input_size,32)
-        self.f2 = nn.Linear(32, output_size)
+        self.f1 = nn.Linear(input_size,64)
+        self.f2 = nn.Linear(64, output_size)
 
 
     def forward(self, x):
