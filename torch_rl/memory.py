@@ -66,10 +66,12 @@ class RingBuffer(object):
 
 
     def pop(self, size):
+        if self.length-size <= 0:
+            raise Exception("This should not happen")
         if self.start >= size:
             self.start -= size
 ***REMOVED***
-            self.length + self.start - size
+            self.length += self.start - size
             self.start = 0
 
     def __iter__(self):
@@ -279,7 +281,6 @@ class HindsightMemory(Memory):
                 Sample hindsight_size of states added from recent terminal state to this one.
                 """
                 self.add_hindsight()
-                self.pop()
                 self.last_terminal_idx = self.goals.last_idx
 
             super(HindsightMemory, self).append(observation, action, reward, terminal, training=True)
@@ -302,17 +303,17 @@ class HindsightMemory(Memory):
         self.rewards.pop(self.hindsight_size)
 
     def add_hindsight(self):
-        for i in range(self.last_terminal_idx+1, self.observations.last_idx):
+        for i in range(self.last_terminal_idx+1, self.observations.last_idx-self.hindsight_size):
             # For every state in episode sample hindsight_size from future states
-            hindsight_idx = sample_batch_indexes(i, self.observations.last_idx, self.hindsight_size)
+            hindsight_idx = sample_batch_indexes(i+1, self.observations.last_idx, self.hindsight_size)
             hindsight_experience = [None] * self.hindsight_size
             for j,idx in enumerate(hindsight_idx):
-                hindsight_experience[j] = idx
+                hindsight_experience[j] = [i,idx]
             self.hindsight_buffer.append(hindsight_experience)
 
-    def sample_and_split(self, batch_size, batch_idxs=None):
-        num_transitions = int(batch_size / self.hindsight_size)
-        batch_idxs = sample_batch_indexes(0, self.hindsight_buffer.length-1, size=num_transitions)
+    def sample_and_split(self, num_transitions, batch_idxs=None):
+        batch_size = num_transitions*self.hindsight_size + num_transitions
+        batch_idxs = sample_batch_indexes(0, self.hindsight_buffer.length, size=num_transitions)
 
         state0_batch = []
         reward_batch = []
@@ -321,19 +322,19 @@ class HindsightMemory(Memory):
         terminal1_batch = []
         state1_batch = []
         for idx in batch_idxs:
-            idx %= self.limit
-            state0_batch.append(self.observations[idx])
-            state1_batch.append(self.observations[idx+1])
-            reward_batch.append(self.rewards[idx])
-            action_batch.append(self.actions[idx])
-            goal_batch.append(self.goals[idx])
             # Add hindsight experience to batch
-            for hindsight_idx in self.hindsight_buffer[idx]:
+            for hindsight_idx, root_idx in self.hindsight_buffer[idx]:
                 state0_batch.append(self.observations[hindsight_idx])
                 state1_batch.append(self.observations[hindsight_idx+1])
-                reward_batch.append(self.rewards[hindsight_idx])
+                reward_batch.append(1)
                 action_batch.append(self.actions[hindsight_idx])
                 goal_batch.append(self.observations[hindsight_idx+1])
+            state0_batch.append(self.observations[root_idx])
+            state1_batch.append(self.observations[root_idx + 1])
+            reward_batch.append(self.rewards[root_idx])
+            action_batch.append(self.actions[root_idx])
+            goal_batch.append(self.goals[root_idx])
+
         # Prepare and validate parameters.
         state0_batch = np.array(state0_batch).reshape(batch_size,-1)
         state1_batch = np.array(state1_batch).reshape(batch_size,-1)
