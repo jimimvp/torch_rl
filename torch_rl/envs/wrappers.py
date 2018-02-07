@@ -59,12 +59,11 @@ class SparseRewardGoalEnv(GoalEnvWrapper):
 
     def __init__(self, *args, **kwargs):
         super(SparseRewardGoalEnv, self).__init__(*args,**kwargs)
-        #TODO add precision, currently it is hardcoded to 1e-3 %
         self.normalising_factor = self.observation_space.high - self.observation_space.low
-        self.precision = 1e-3
+        self.precision = kwargs.get("precision", 1e-2)
 
     def _reward(self, reward):
-        if np.any(np.abs(self._goal - self._s)/self.normalising_factor > 1e-3):
+        if np.any((np.abs(self._goal - self._s)/self.normalising_factor) > self.precision):
             return 0
 ***REMOVED***
             return 1
