@@ -3,11 +3,11 @@ import pandas as pd
 import datetime
 import os
 import numpy as np
-from torch_rl.utils import Parameters, prRed
+from torch_rl.utils import Parameters, prRed, Callback
 import glob
 import shutil
 
-class RLTrainingStats(object):
+class RLTrainingStats(Callback):
     """
         Keeps training statistics and writes them to a file and loads them.
     """
@@ -71,12 +71,10 @@ class RLTrainingStats(object):
         if episode % self.save_rate == 0:
             self.save()
 
-    def episode_step(self, episode, episode_reward, **kwargs):
-        self.episode_reward_buffer.append(episode_reward)
-
-        kwargs["reward"] = episode_reward
+    def episode_step(self, **kwargs):
+        self.episode_reward_buffer.append(kwargs['episode_reward'])
+        episode = kwargs['episode']
         kwargs["mvavg_reward"] = np.mean(self.episode_reward_buffer)
-        kwargs['episode'] = episode
         df = pd.DataFrame.from_records([kwargs], index=['episode'])
 
         if not self.episode_data is None:
