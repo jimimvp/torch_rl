@@ -19,8 +19,8 @@ class BitFlippingEnv(object):
         if action < self.state.size:
             self.state[action] ^= 1
         reward = np.array_equal(self.state, self.goal)
-
-        return self.state, int(reward), self.done, {}
+        self.done = reward
+        return self.state, int(reward), reward, {}
 
     def reset(self):
         self.goal = np.random.choice([0,1], self.num_bits)
