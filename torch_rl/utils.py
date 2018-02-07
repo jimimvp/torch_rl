@@ -140,3 +140,12 @@ class Parameters(object):
         d = self.__dict__
         return namedtuple('Parameters', d.keys())(**self.__dict__)
 
+
+class Callback(object):
+
+    def step(self, *args, **kwargs):
+***REMOVED***
+
+    def episode_step(self, *args, **kwargs):
+***REMOVED***
+
