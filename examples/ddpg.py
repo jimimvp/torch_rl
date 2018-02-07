@@ -2,6 +2,7 @@ import gym
 from torch.optim import Adam
 from torch_rl.utils import *
 import time
+from collections import deque
 
 from torch_rl.models import SimpleNetwork
 from torch_rl.core import ActorCriticAgent
@@ -35,9 +36,9 @@ warmup = 2000
 max_episode_length = 500
 actor_learning_rate = 1e-4
 critic_learning_rate = 1e-3
-middle_layer_size = [400,300]
+middle_layer_size = [400,300, 100]
 weight_init_sigma = 0.003
-
+acc_reward_deque = deque(maxlen=100)
 
 
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
@@ -53,13 +54,13 @@ random_process = OrnsteinUhlenbeckActionNoise(num_actions, sigma=0.2)
 action_choice_function = random_process_action_choice(random_process)
 
 policy = cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
-                           activation_functions=[relu,relu,tanh]))
+                           activation_functions=[relu,relu,relu,tanh]))
 target_policy =  cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
-                           activation_functions=[relu,relu,tanh ]))
+                           activation_functions=[relu,relu,relu,tanh ]))
 critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions, middle_layer_size[0], middle_layer_size[1], 1],
-                           activation_functions=[relu,relu]))
+                           activation_functions=[relu,relu,relu]))
 target_critic =  cuda_if_available(SimpleNetwork([num_observations+num_actions,middle_layer_size[0], middle_layer_size[1], 1],
-                           activation_functions=[relu,relu]))
+                           activation_functions=[relu,relu,relu]))
 
 policy.apply(gauss_init(0,weight_init_sigma))
 critic.apply(gauss_init(0,weight_init_sigma))
@@ -139,8 +140,8 @@ for episode in range(num_episodes):
 
         if done:
             break
-
-    stats.episode_step(episode, acc_reward)
+    acc_reward_deque.append(acc_reward)
+    stats.episode_step(episode, acc_reward, mvavg_reward=np.mean(acc_reward_deque))
 
     episode_time = time.time() - t_episode_start
     prRed("#Training time: {:.2f} minutes".format(time.clock()/60))
