@@ -28,15 +28,20 @@ class NormalisedObservationsWrapper(gym.ObservationWrapper):
 class GoalEnvWrapper(gym.RewardWrapper):
     """
     Wrapper to create a goal based environment.
-    TODO add posibility to take part of the observation as a goal, this makes more sense
     """
-
     def __init__(self,*args,**kwargs):
+        if "indices" in kwargs:
+            self.indices = kwargs.get("indices")
+            del kwargs['indices']
+***REMOVED***
+            self.indices = None
         super(GoalEnvWrapper, self).__init__(*args, **kwargs)
+        if self.indices is None:
+            self.indices = np.arange(0, self.observation_space.shape[0])
 
     def reset(self, **kwargs):
         self._s = super(GoalEnvWrapper, self).reset(**kwargs)
-        self._goal = self.observation_space.sample()
+        self._goal = self.observation_space.sample()[self.indices]
         return self._s
 
     def _step(self, action):
@@ -45,7 +50,7 @@ class GoalEnvWrapper(gym.RewardWrapper):
         return info
 
     def _reward(self, reward):
-        return - np.mean(np.abs(self._goal - self._s))
+        return - np.mean(np.abs(self._goal - self._s[self.indices]))
 
     @property
     def goal(self):
@@ -58,12 +63,13 @@ class SparseRewardGoalEnv(GoalEnvWrapper):
     """
 
     def __init__(self, *args, **kwargs):
+        self.precision = kwargs.get("precision", 1e-2)
+        del kwargs['precision']
         super(SparseRewardGoalEnv, self).__init__(*args,**kwargs)
         self.normalising_factor = self.observation_space.high - self.observation_space.low
-        self.precision = kwargs.get("precision", 1e-2)
 
     def _reward(self, reward):
-        if np.any((np.abs(self._goal - self._s)/self.normalising_factor) > self.precision):
+        if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
             return 0
 ***REMOVED***
             return 1
