@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from collections import deque, namedtuple
 import warnings
 import random
+from typing import overload
 
 import numpy as np
 
@@ -9,8 +10,7 @@ import numpy as np
 
 # This is to be understood as a transition: Given `state0`, performing `action`
 # yields `reward` and results in `state1`, which might be `terminal`.
-Experience = namedtuple('Experience', 'state0, action, reward, state1, terminal1')
-
+Experience = namedtuple('Experience', 'state0, goal, action, reward, state1, terminal1')
 
 def sample_batch_indexes(low, high, size):
     if high - low >= size:
@@ -148,6 +148,7 @@ class SequentialMemory(Memory):
         self.rewards = RingBuffer(limit)
         self.terminals = RingBuffer(limit)
         self.observations = RingBuffer(limit)
+        self.goals = RingBuffer(limit)
 
     def sample(self, batch_size, batch_idxs=None):
         if batch_idxs is None:
@@ -188,6 +189,7 @@ class SequentialMemory(Memory):
             action = self.actions[idx - 1]
             reward = self.rewards[idx - 1]
             terminal1 = self.terminals[idx - 1]
+            goal = self.goals[idx-1] if self.goals.length > 0 else None
 
             # Okay, now we need to create the follow-up state. This is state0 shifted on timestep
             # to the right. Again, we need to be careful to not include an observation from the next
@@ -197,7 +199,7 @@ class SequentialMemory(Memory):
 
             assert len(state0) == self.window_length
             assert len(state1) == len(state0)
-            experiences.append(Experience(state0=state0, action=action, reward=reward,
+            experiences.append(Experience(state0=state0, goal=goal, action=action, reward=reward,
                                           state1=state1, terminal1=terminal1))
         assert len(experiences) == batch_size
         return experiences
@@ -206,6 +208,7 @@ class SequentialMemory(Memory):
         experiences = self.sample(batch_size, batch_idxs)
 
         state0_batch = []
+        goal_batch = []
         reward_batch = []
         action_batch = []
         terminal1_batch = []
@@ -215,6 +218,7 @@ class SequentialMemory(Memory):
             state1_batch.append(e.state1)
             reward_batch.append(e.reward)
             action_batch.append(e.action)
+            goal_batch.append(e.goal)
             terminal1_batch.append(0. if e.terminal1 else 1.)
 
         # Prepare and validate parameters.
@@ -224,10 +228,12 @@ class SequentialMemory(Memory):
         reward_batch = np.array(reward_batch).reshape(batch_size,-1)
         action_batch = np.array(action_batch).reshape(batch_size,-1)
 
-        return state0_batch, action_batch, reward_batch, state1_batch, terminal1_batch
+        if self.goals.length > 0:
+            return state0_batch, goal_batch, action_batch, reward_batch, state1_batch, terminal1_batch
+***REMOVED***
+            return state0_batch, action_batch, reward_batch, state1_batch, terminal1_batch
 
-
-    def append(self, observation, action, reward, terminal, training=True):
+    def _append(self, observation, action, reward, terminal, training=True):
         super(SequentialMemory, self).append(observation, action, reward, terminal, training=training)
         
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
@@ -237,6 +243,17 @@ class SequentialMemory(Memory):
             self.actions.append(action)
             self.rewards.append(reward)
             self.terminals.append(terminal)
+
+    def _appendg(self, observation, goal, action, reward, terminal, training=True):
+        self._append(observation, action, reward, terminal, training=training)
+        if training:
+            self.goals.append(goal)
+
+    def append(self, *args, **kwargs):
+        try:
+            self._appendg(*args, **kwargs)
+        except Exception as e:
+            self._append(*args, **kwargs)
 
     @property
     def nb_entries(self):
