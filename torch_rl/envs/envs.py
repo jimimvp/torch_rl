@@ -35,32 +35,6 @@ class BitFlippingEnv(object):
 
 
 
-
-class NormalisedActionsWrapper(gym.ActionWrapper):
-
-    def _action(self, action):
-        action = (action + 1) / 2  # [-1, 1] => [0, 1]
-        action *= (self.action_space.high - self.action_space.low)
-        action += self.action_space.low
-        return action
-
-    def _reverse_action(self, action):
-        action -= self.action_space.low
-        action /= (self.action_space.high - self.action_space.low)
-        action = action * 2 - 1
-        return action
-
-
-class NormalisedObservationsWrapper(gym.ObservationWrapper):
-
-    def _observation(self, observation):
-        observation -= self.observation_space.low
-        observation /= (self.observation_space.high - self.observation_space.low)
-        observation = observation*2-1
-        return observation
-
-
-
 class BanditEnv(gym.Env):
 
     def __init__(self, num_bandits):
