@@ -2,11 +2,12 @@ import gym
 from torch.optim import Adam
 from torch_rl.utils import *
 import time
+import numpy as np
 
 from torch_rl.models import SimpleNetwork
 from torch_rl.core import ActorCriticAgent
 from torch_rl.envs import NormalisedActionsWrapper
-from torch_rl.memory import HindsightMemory
+from torch_rl.memory import HindsightMemory, SequentialMemory
 from torch_rl.stats import RLTrainingStats
 
 """
@@ -27,6 +28,10 @@ def mse_loss(input, target):
     return tor.mean(tor.sum((input - target) ** 2))
 
 
+# Set seed
+np.random.seed(666)
+
+
 # Training parameters
 num_episodes = 80000
 batch_size = 8
@@ -41,8 +46,9 @@ actor_learning_rate = 1e-4
 critic_learning_rate = 1e-3
 middle_layer_size = [400, 300]
 weight_init_sigma = 0.003
+hindsight = True
 
-replay_memory = HindsightMemory(limit=6000000, window_length=1)
+replay_memory = HindsightMemory(limit=replay_capacity, window_length=1) if hindsight else SequentialMemory(replay_capacity, window_length=1)
 
 env = NormalisedActionsWrapper(gym.make("Pendulum-v0"))
 env.reset()
