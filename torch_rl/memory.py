@@ -272,7 +272,7 @@ class HindsightMemory(Memory):
         transition sampling.
     """
 
-    def __init__(self, limit, hindsight_size=8, reward_function=lambda observation,goal: 1, **kwargs):
+    def __init__(self, limit, hindsight_size=8, goal_indices=None, reward_function=lambda observation,goal: 1, **kwargs):
         super(HindsightMemory, self).__init__(**kwargs)
         self.hindsight_size = hindsight_size
         self.reward_function = reward_function
@@ -285,6 +285,7 @@ class HindsightMemory(Memory):
 
         self.limit = limit
         self.last_terminal_idx = 0
+        self.goal_indices = goal_indices
 
     def append(self, observation, goal, action, reward, terminal, training=True):
         if training:
@@ -346,7 +347,8 @@ class HindsightMemory(Memory):
                 state1_batch.append(self.observations[hindsight_idx+1])
                 reward_batch.append(1)
                 action_batch.append(self.actions[hindsight_idx])
-                goal_batch.append(self.observations[hindsight_idx+1])
+                goal_batch.append(self.observations[hindsight_idx+1] if self.goal_indices is None else \
+                                  self.observations[hindsight_idx+1][self.goal_indices])
             state0_batch.append(self.observations[root_idx])
             state1_batch.append(self.observations[root_idx + 1])
             reward_batch.append(self.rewards[root_idx])
