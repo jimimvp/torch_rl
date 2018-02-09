@@ -129,7 +129,7 @@ class OrnsteinUhlenbeckActionNoise:
         return self.sample()
 
 
-
+import json
 
 class Parameters(object):
 
@@ -139,6 +139,22 @@ class Parameters(object):
     def to_named_tuple(self):
         d = self.__dict__
         return namedtuple('Parameters', d.keys())(**self.__dict__)
+
+    @classmethod
+    def from_config(cls, path):
+        with open(path, "r") as f:
+            config = f.read()
+            config_dict = json.dumps(config)
+            p = Parameters.from_args(config_dict)
+        return p
+
+    @classmethod
+    def from_args(cls, args):
+        p = Parameters()
+        d = vars(args)
+        for k, i in d:
+            setattr(p, k, i)
+        return p
 
 
 class Callback(object):
