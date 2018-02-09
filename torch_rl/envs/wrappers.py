@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+from .utils import wrapped_by
 
 class NormalisedActionsWrapper(gym.ActionWrapper):
 
@@ -66,7 +67,10 @@ class SparseRewardGoalEnv(GoalEnvWrapper):
         self.precision = kwargs.get("precision", 1e-2)
         del kwargs['precision']
         super(SparseRewardGoalEnv, self).__init__(*args,**kwargs)
-        self.normalising_factor = self.observation_space.high - self.observation_space.low
+        if not wrapped_by(self.env, NormalisedObservationsWrapper):
+            self.normalising_factor = self.observation_space.high - self.observation_space.low
+***REMOVED***
+            self.normalising_factor = 2.
 
     def _reward(self, reward):
         if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
