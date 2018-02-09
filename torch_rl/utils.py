@@ -144,7 +144,7 @@ class Parameters(object):
     def from_config(cls, path):
         with open(path, "r") as f:
             config = f.read()
-            config_dict = json.dumps(config)
+            config_dict = json.laods(config)
             p = Parameters.from_args(config_dict)
         return p
 
@@ -152,9 +152,14 @@ class Parameters(object):
     def from_args(cls, args):
         p = Parameters()
         d = vars(args)
-        for k, i in d:
+        for k, i in d.items():
             setattr(p, k, i)
         return p
+
+    def to_json(self, path):
+        with open(path, 'w') as f:
+            json.dump(vars(self), f)
+
 
 
 class Callback(object):
