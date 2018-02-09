@@ -2,7 +2,7 @@ import gym
 from torch_rl.utils import *
 
 from torch_rl.models import SimpleNetwork
-from torch_rl.envs import NormalisedActionsWrapper
+from torch_rl.envs import NormalisedActionsWrapper, NormalisedObservationsWrapper
 from torch_rl.memory import SequentialMemory, HindsightMemory
 from torch_rl.training import DDPGTrainer
 from torch_rl.envs import SparseRewardGoalEnv
@@ -63,18 +63,22 @@ if __name__ == '__main__':
                         help='Size of hindsight per transition.')
     parser.add_argument('--config', "-c", default=None, type=str,
                         help='Path to config file for the training.')
-    p = parser.parse_args()
+    p = Parameters.from_args(parser.parse_args())
 
     hindsight = p.hindsight
     suff = "_her" if hindsight else ""
 
-    replay_memory = HindsightMemory(limit=p.replay_capacity, window_length=1, hindsight_size=p.hindsight_size)  \
-        if hindsight else SequentialMemory(p.replay_capacity, window_length=1)
+    goal_indices = np.asarray([0,1])
 
-    env = SparseRewardGoalEnv(NormalisedActionsWrapper(gym.make("Pendulum-v0")), precision=1e-1)
+    replay_memory = HindsightMemory(limit=p.replay_capacity, window_length=1, hindsight_size=p.hindsight_size,
+                                    goal_indices=goal_indices) if hindsight else SequentialMemory(p.replay_capacity, window_length=1)
+
+    env = SparseRewardGoalEnv(NormalisedObservationsWrapper(
+        NormalisedActionsWrapper(gym.make("Pendulum-v0"))), precision=1e-1, indices=goal_indices)
+
     env.reset()
     num_actions = env.action_space.shape[0]
-    num_observations = env.observation_space.shape[0]*2
+    num_observations = env.observation_space.shape[0]+2
     relu, tanh = tor.nn.ReLU(), tor.nn.Tanh()
 
     actor = cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
@@ -93,8 +97,11 @@ if __name__ == '__main__':
                           lr_actor=p.actor_learning_rate, lr_critic=p.critic_learning_rate, warmup=p.warmup, replay_memory=replay_memory
                           )
 
-    stats = RLTrainingStats(save_destination="/disk/no_backup/vlasteli/Projects/torch_rl/examples/ddpg"+ suff + "_" + str(datetime.datetime.now()).replace(" ", "_"))
+    output_dir = "/disk/no_backup/vlasteli/Projects/torch_rl/examples/ddpg"+ suff + "_" + str(datetime.datetime.now()).replace(" ", "_")
 
+    stats = RLTrainingStats(save_destination=output_dir)
+    p.to_json(os.path.join(output_dir, "config.json"))
 
     trainer.train(8000, max_episode_len=p.max_episode_length, verbose=True, callbacks=[stats])
+
 
