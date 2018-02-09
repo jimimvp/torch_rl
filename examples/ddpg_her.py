@@ -8,6 +8,8 @@ from torch_rl.training import DDPGTrainer
 from torch_rl.envs import SparseRewardGoalEnv
 from torch_rl.stats import RLTrainingStats
 import datetime
+import argparse
+import numpy as np
 """
     Implementation of deep deterministic policy gradients with soft updates.
 
@@ -28,30 +30,71 @@ critic_learning_rate = 1e-3
 middle_layer_size = [400, 300]
 weight_init_sigma = 0.003
 
-replay_memory = HindsightMemory(limit=6000000, window_length=1)
 
-env = SparseRewardGoalEnv(NormalisedActionsWrapper(gym.make("Pendulum-v0")), precision=1e-1)
-env.reset()
-num_actions = env.action_space.shape[0]
-num_observations = env.observation_space.shape[0]*2
-relu, tanh = tor.nn.ReLU(), tor.nn.Tanh()
+if __name__ == '__main__':
 
-actor = cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
-                                        activation_functions=[relu, relu, tanh]))
 
-critic = cuda_if_available(
-    SimpleNetwork([num_observations + num_actions, middle_layer_size[0], middle_layer_size[1], 1],
-                  activation_functions=[relu, relu]))
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--hindsight', "-hi", action="store_true", default=False,
+                        help='Use hindsight replay buffer.')
+    parser.add_argument('--epsilon', "-e", default=1.0, type=float,
+                        help='Epsilon for exploration with linear decay.')
+    parser.add_argument('--depsilon', "-de", default=5000., type=float,
+                        help='Slope of linear decay of epsilon per step.')
+    parser.add_argument('--gamma', "-g", default=.99, type=float,
+                        help='Reward discount factor')
+    parser.add_argument('--batch', "-bs", default=16*4+16, type=int,
+                        help='Batch size, in case of hindsight replay has to be equal to hindsight_size*transitions + transitions')
+    parser.add_argument('--replay_capacity', "-rc", default=1000000, type=int,
+                        help="Capacity of the replay buffer.")
+    parser.add_argument('--max_episode_length', "-mel", default=500, type=int,
+                        help='Max number of steps per episode')
+    parser.add_argument('--actor_learning_rate', "-aler", default=1e-4, type=float,
+                        help='Learning rate of actor.')
+    parser.add_argument('--critic_learning_rate', "-cler", default=1e-3, type=float,
+                        help='Learning rate of critic.')
+    parser.add_argument('--warmup', "-w", default=2000, type=int,
+                        help='Number of steps to use for warmup.')
+    parser.add_argument('--wsigma', "-ws", default=1e-3, type=float,
+                        help='Sigma to use for weight initialization Gauss distribution.')
+    parser.add_argument('--tau', "-t", default=1e-3, type=float,
+                        help='Tau for soft updates of target actor and critic.')
+    parser.add_argument('--hindsight_size', "-hs", default=4, type=int,
+                        help='Size of hindsight per transition.')
+    parser.add_argument('--config', "-c", default=None, type=str,
+                        help='Path to config file for the training.')
+    p = parser.parse_args()
 
-actor.apply(gauss_init(0, weight_init_sigma))
-critic.apply(gauss_init(0, weight_init_sigma))
+    hindsight = p.hindsight
+    suff = "_her" if hindsight else ""
 
-# Training
-trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
-                      tau=tau, epsilon=epsilon, batch_size=batch_size, depsilon=depsilon, gamma=gamma,
-                      lr_actor=actor_learning_rate, lr_critic=critic_learning_rate, warmup=warmup, replay_memory=replay_memory
-                      )
+    replay_memory = HindsightMemory(limit=p.replay_capacity, window_length=1, hindsight_size=p.hindsight_size)  \
+        if hindsight else SequentialMemory(p.replay_capacity, window_length=1)
 
-stats = RLTrainingStats(save_destination="/disk/no_backup/vlasteli/Projects/torch_rl/examples/ddpg_her_" + str(datetime.datetime.now()).replace(" ", "_"))
+    env = SparseRewardGoalEnv(NormalisedActionsWrapper(gym.make("Pendulum-v0")), precision=1e-1)
+    env.reset()
+    num_actions = env.action_space.shape[0]
+    num_observations = env.observation_space.shape[0]*2
+    relu, tanh = tor.nn.ReLU(), tor.nn.Tanh()
 
-trainer.train(2000, max_episode_len=500, verbose=True, callbacks=[stats])
+    actor = cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
+                                            activation_functions=[relu, relu, tanh]))
+
+    critic = cuda_if_available(
+        SimpleNetwork([num_observations + num_actions, middle_layer_size[0], middle_layer_size[1], 1],
+                      activation_functions=[relu, relu]))
+
+    actor.apply(gauss_init(0, p.wsigma))
+    critic.apply(gauss_init(0, p.wsigma))
+
+    # Training
+    trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
+                          tau=p.tau, epsilon=p.epsilon, batch_size=p.batch, depsilon=p.epsilon, gamma=p.gamma,
+                          lr_actor=p.actor_learning_rate, lr_critic=p.critic_learning_rate, warmup=p.warmup, replay_memory=replay_memory
+                          )
+
+    stats = RLTrainingStats(save_destination="/disk/no_backup/vlasteli/Projects/torch_rl/examples/ddpg"+ suff + "_" + str(datetime.datetime.now()).replace(" ", "_"))
+
+
+    trainer.train(8000, max_episode_len=p.max_episode_length, verbose=True, callbacks=[stats])
+
