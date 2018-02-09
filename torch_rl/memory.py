@@ -322,11 +322,11 @@ class HindsightMemory(Memory):
     def add_hindsight(self):
         for i in range(self.last_terminal_idx+1, self.observations.last_idx-self.hindsight_size):
             # For every state in episode sample hindsight_size from future states
-            hindsight_idx = sample_batch_indexes(i+1, self.observations.last_idx, self.hindsight_size)
-            hindsight_experience = [None] * self.hindsight_size
-            for j,idx in enumerate(hindsight_idx):
+            # hindsight_idx = sample_batch_indexes(i+1, self.observations.last_idx, self.hindsight_size)
+            hindsight_experience = (self.observations.last_idx - i - 1)*[None]
+            for j,idx in enumerate(range(i+1, self.observations.last_idx)):
                 hindsight_experience[j] = [i,idx]
-            self.hindsight_buffer.append(hindsight_experience)
+            self.hindsight_buffer.append(np.asarray(hindsight_experience))
 
     def sample_and_split(self, num_transitions, batch_idxs=None):
         batch_size = num_transitions*self.hindsight_size + num_transitions
@@ -340,7 +340,8 @@ class HindsightMemory(Memory):
         state1_batch = []
         for idx in batch_idxs:
             # Add hindsight experience to batch
-            for hindsight_idx, root_idx in self.hindsight_buffer[idx]:
+            hindsight_idxs = sample_batch_indexes(0, len(self.hindsight_buffer[idx]), self.hindsight_size)
+            for root_idx, hindsight_idx in self.hindsight_buffer[idx][hindsight_idxs]:
                 state0_batch.append(self.observations[hindsight_idx])
                 state1_batch.append(self.observations[hindsight_idx+1])
                 reward_batch.append(1)
