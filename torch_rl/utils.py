@@ -1,9 +1,7 @@
 import torch as tor
 from torch.autograd import Variable
 import numpy as np
-import random
-from collections import namedtuple, deque
-import os
+from collections import namedtuple
 
 
 
@@ -131,6 +129,9 @@ class OrnsteinUhlenbeckActionNoise:
 
 import json
 
+
+
+
 class Parameters(object):
 
     def __init__(self):
@@ -144,14 +145,14 @@ class Parameters(object):
     def from_config(cls, path):
         with open(path, "r") as f:
             config = f.read()
-            config_dict = json.laods(config)
+            config_dict = json.loads(config)
             p = Parameters.from_args(config_dict)
         return p
 
     @classmethod
     def from_args(cls, args):
         p = Parameters()
-        d = vars(args)
+        d = args
         for k, i in d.items():
             setattr(p, k, i)
         return p
@@ -159,6 +160,39 @@ class Parameters(object):
     def to_json(self, path):
         with open(path, 'w') as f:
             json.dump(vars(self), f)
+
+
+import itertools
+class ParameterGrid(Parameters):
+
+    @classmethod
+    def from_args(cls, args):
+        p = ParameterGrid()
+        d = args
+        for k, i in d.items():
+            setattr(p, k, i)
+        setattr(p, "grid", d)
+
+        return p
+
+    @classmethod
+    def from_config(cls, path):
+        with open(path, "r") as f:
+            config = f.read()
+            config_dict = json.loads(config)
+            p = ParameterGrid.from_args(config_dict)
+        return p
+
+    def __iter__(self):
+        """
+        Iterate over parameter grid
+        :return:
+        """
+        for params in itertools.product(*self.grid.values()):
+            parameters = {}
+            for k, p in zip(self.grid.keys(), params):
+                parameters[k] = p
+            yield Parameters.from_args(parameters)
 
 
 
