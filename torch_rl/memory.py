@@ -370,6 +370,89 @@ class HindsightMemory(Memory):
         return len(self.observations)
 
 
+
+
+
+class***REMOVED***HindsightMemory(HindsightMemory):
+    """
+        Implementation of replay memory for hindsight experience replay with future
+        transition sampling.
+    """
+
+    def __init__(self, limit, hindsight_size=8, goal_indices=None, reward_function=lambda observation,goal: 1, **kwargs):
+        super(SpikingHindsightMemory, self).__init__(limit, hindsight_size, goal_indices, reward_function, **kwargs)
+        self.sobservations = RingBuffer(limit)
+
+    def append(self, observation, sobservation, goal, action, reward, terminal, training=True):
+        if training:
+            self.sobservations.append(sobservation)
+            super(SpikingHindsightMemory, self).append(observation, goal, action, reward, terminal, training=True)
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= self.nb_entries:
+            raise KeyError()
+        return self.observations[idx], self.sobservations[idx], self.goals[idx], self.actions[idx], self.rewards[idx], self.terminals[idx]
+
+
+    def add_hindsight(self):
+        for i in range(self.last_terminal_idx+1, self.observations.last_idx-self.hindsight_size):
+            # For every state in episode sample hindsight_size from future states
+            # hindsight_idx = sample_batch_indexes(i+1, self.observations.last_idx, self.hindsight_size)
+            hindsight_experience = (self.observations.last_idx - i - 1)*[None]
+            for j,idx in enumerate(range(i+1, self.observations.last_idx)):
+                hindsight_experience[j] = [i,idx]
+            self.hindsight_buffer.append(np.asarray(hindsight_experience))
+
+    def sample_and_split(self, num_transitions, batch_idxs=None):
+        batch_size = num_transitions*self.hindsight_size + num_transitions
+        batch_idxs = sample_batch_indexes(0, self.hindsight_buffer.length, size=num_transitions)
+
+        state0_batch = []
+        sstate0_batch = []
+        reward_batch = []
+        goal_batch = []
+        action_batch = []
+        terminal1_batch = []
+        state1_batch = []
+        sstate1_batch = []
+        for idx in batch_idxs:
+            # Add hindsight experience to batch
+            hindsight_idxs = sample_batch_indexes(0, len(self.hindsight_buffer[idx]), self.hindsight_size)
+            for root_idx, hindsight_idx in self.hindsight_buffer[idx][hindsight_idxs]:
+                state0_batch.append(self.observations[hindsight_idx])
+                sstate0_batch.append(self.sobservations[hindsight_idx])
+                state1_batch.append(self.observations[hindsight_idx+1])
+                sstate1_batch.append(self.sobservations[hindsight_idx+1])
+                reward_batch.append(1)
+                action_batch.append(self.actions[hindsight_idx])
+                goal_batch.append(self.observations[hindsight_idx+1] if self.goal_indices is None else \
+                                  self.observations[hindsight_idx+1][self.goal_indices])
+            state0_batch.append(self.observations[root_idx])
+            sstate0_batch.append(self.sobservations[root_idx])
+            state1_batch.append(self.observations[root_idx + 1])
+            sstate1_batch.append(self.sobservations[root_idx + 1])
+            reward_batch.append(self.rewards[root_idx])
+            action_batch.append(self.actions[root_idx])
+            goal_batch.append(self.goals[root_idx])
+
+        # Prepare and validate parameters.
+        state0_batch = np.array(state0_batch).reshape(batch_size,-1)
+        sstate0_batch = np.array(sstate0_batch).reshape(batch_size, -1)
+        state1_batch = np.array(state1_batch).reshape(batch_size,-1)
+        sstate1_batch = np.array(sstate1_batch).reshape(batch_size, -1)
+        terminal1_batch = np.array(terminal1_batch).reshape(batch_size,-1)
+        reward_batch = np.array(reward_batch).reshape(batch_size,-1)
+        action_batch = np.array(action_batch).reshape(batch_size,-1)
+
+        return state0_batch, sstate0_batch, goal_batch, action_batch, reward_batch, \
+               state1_batch, sstate1_batch, terminal1_batch
+
+
+    @property
+    def nb_entries(self):
+        return len(self.observations)
+
+
 class EpisodeParameterMemory(Memory):
     def __init__(self, limit, **kwargs):
         super(EpisodeParameterMemory, self).__init__(**kwargs)
