@@ -3,10 +3,11 @@ from torch_rl.utils import *
 
 from torch_rl.models import SimpleNetwork
 from torch_rl.envs import NormalisedActionsWrapper, NormalisedObservationsWrapper
-from torch_rl.memory import SequentialMemory, HindsightMemory
-from torch_rl.training import DDPGTrainer
+from torch_rl.memory import SequentialMemory,***REMOVED***HindsightMemory,  HindsightMemory
+from torch_rl.training import DDPGTrainer,***REMOVED***DDPGTrainer
 from torch_rl.envs import SparseRewardGoalEnv
 from torch_rl.stats import RLTrainingStats
+from torch_rl.models import Reservoir
 import datetime
 import argparse
 import numpy as np
@@ -63,41 +64,73 @@ if __name__ == '__main__':
                         help='Size of hindsight per transition.')
     parser.add_argument('--config', "-c", default=None, type=str,
                         help='Path to config file for the training.')
+    parser.add_argument('--reservoir', "-re", default=None, type=int,
+                        help='Size of reservoir to use in training, if this is specified, then a reservoir is used for'
+                             'state transformation of the current observation, but not the goal.')
     p = Parameters.from_args(parser.parse_args())
 
     hindsight = p.hindsight
     suff = "_her" if hindsight else ""
 
     goal_indices = np.asarray([0,1])
-
-    replay_memory = HindsightMemory(limit=p.replay_capacity, window_length=1, hindsight_size=p.hindsight_size,
-                                    goal_indices=goal_indices) if hindsight else SequentialMemory(p.replay_capacity, window_length=1)
-
     env = SparseRewardGoalEnv(NormalisedObservationsWrapper(
         NormalisedActionsWrapper(gym.make("Pendulum-v0"))), precision=1e-1, indices=goal_indices)
-
     env.reset()
     num_actions = env.action_space.shape[0]
-    num_observations = env.observation_space.shape[0]+2
+    num_observations = env.observation_space.shape[0] + 2
     relu, tanh = tor.nn.ReLU(), tor.nn.Tanh()
 
-    actor = cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
-                                            activation_functions=[relu, relu, tanh]))
+    if p.reservoir:
+        print("Using reservoir...")
+        reservoir = Reservoir(0.1, 0.01, env.observation_space.shape[0], p.reservoir, recursive=True)
+        replay_memory =***REMOVED***HindsightMemory(limit=p.replay_capacity, hindsight_size=p.hindsight_size,
+                                        goal_indices=goal_indices, window_length=1)
 
-    critic = cuda_if_available(
-        SimpleNetwork([num_observations + num_actions, middle_layer_size[0], middle_layer_size[1], 1],
-                      activation_functions=[relu, relu]))
+        actor = cuda_if_available(SimpleNetwork([p.reservoir + len(goal_indices), middle_layer_size[0], middle_layer_size[1], num_actions],
+                                                activation_functions=[relu, relu, tanh]))
 
-    actor.apply(gauss_init(0, p.wsigma))
-    critic.apply(gauss_init(0, p.wsigma))
+        critic = cuda_if_available(
+            SimpleNetwork([p.reservoir + len(goal_indices) + num_actions, middle_layer_size[0], middle_layer_size[1], 1],
+                          activation_functions=[relu, relu]))
 
-    # Training
-    trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
-                          tau=p.tau, epsilon=p.epsilon, batch_size=p.batch, depsilon=p.epsilon, gamma=p.gamma,
-                          lr_actor=p.actor_learning_rate, lr_critic=p.critic_learning_rate, warmup=p.warmup, replay_memory=replay_memory
-                          )
+        actor.apply(gauss_init(0, p.wsigma))
+        critic.apply(gauss_init(0, p.wsigma))
 
-    output_dir = "/disk/no_backup/vlasteli/Projects/torch_rl/examples/ddpg"+ suff + "_" + str(datetime.datetime.now()).replace(" ", "_")
+        # Training
+        trainer =***REMOVED***DDPGTrainer(env=env, actor=actor, critic=critic, reservoir=reservoir,
+                              tau=p.tau, epsilon=p.epsilon, batch_size=p.batch, depsilon=p.epsilon, gamma=p.gamma,
+                              lr_actor=p.actor_learning_rate, lr_critic=p.critic_learning_rate, warmup=p.warmup, replay_memory=replay_memory
+                              )
+
+        output_dir = "/disk/no_backup/vlasteli/Projects/torch_rl/examples/ddpg_reservoir"+ suff + "_" + str(datetime.datetime.now()).replace(" ", "_")
+
+    else:
+
+        replay_memory = HindsightMemory(limit=p.replay_capacity, window_length=1, hindsight_size=p.hindsight_size,
+                                    goal_indices=goal_indices) if hindsight else SequentialMemory(p.replay_capacity)
+        relu, tanh = tor.nn.ReLU(), tor.nn.Tanh()
+
+        actor = cuda_if_available(
+            SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
+                          activation_functions=[relu, relu, tanh]))
+
+        critic = cuda_if_available(
+            SimpleNetwork([num_observations + num_actions, middle_layer_size[0], middle_layer_size[1], 1],
+                          activation_functions=[relu, relu]))
+
+        actor.apply(gauss_init(0, p.wsigma))
+        critic.apply(gauss_init(0, p.wsigma))
+
+        # Training
+        trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
+                              tau=p.tau, epsilon=p.epsilon, batch_size=p.batch, depsilon=p.epsilon, gamma=p.gamma,
+                              lr_actor=p.actor_learning_rate, lr_critic=p.critic_learning_rate, warmup=p.warmup,
+                              replay_memory=replay_memory
+                              )
+
+        output_dir = "/disk/no_backup/vlasteli/Projects/torch_rl/examples/ddpg" + suff + "_" + str(
+            datetime.datetime.now()).replace(" ", "_")
+
 
     stats = RLTrainingStats(save_destination=output_dir)
     p.to_json(os.path.join(output_dir, "config.json"))
