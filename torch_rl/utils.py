@@ -169,10 +169,13 @@ class ParameterGrid(Parameters):
     def from_args(cls, args):
         p = ParameterGrid()
         d = args
+        c = 0
         for k, i in d.items():
+            c+=len(i)
             setattr(p, k, i)
         setattr(p, "grid", d)
-
+        setattr(p, "cart_product", itertools.product(*p.grid.values()))
+        setattr(p, "size", c)
         return p
 
     @classmethod
@@ -188,13 +191,14 @@ class ParameterGrid(Parameters):
         Iterate over parameter grid
         :return:
         """
-        for params in itertools.product(*self.grid.values()):
+        for params in self.cart_product:
             parameters = {}
             for k, p in zip(self.grid.keys(), params):
                 parameters[k] = p
             yield Parameters.from_args(parameters)
 
-
+    def __len__(self):
+        return self.size
 
 class Callback(object):
 

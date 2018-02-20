@@ -8,6 +8,7 @@ from torch_rl.core import ActorCriticAgent
 from torch_rl.envs import NormalisedActionsWrapper
 from torch_rl.memory import HindsightMemory, SequentialMemory
 from torch_rl.stats import RLTrainingStats
+from collections import deque
 import copy
 
 """
