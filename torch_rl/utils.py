@@ -163,19 +163,38 @@ class Parameters(object):
 
 
 import itertools
+
+def cart_product(d, i=0):
+    """
+    Generator function for cartesian product of dictionary when each entry in key is a list.
+    :param d: Dictionary
+    :param i: Index of key that is being iterated over
+    :return: Dictionary of parameters
+    """
+    # If iterated over all parameters, return empty dict
+    if i >= len(d.keys()):
+        yield {}
+        return None
+
+    k = list(d.keys())[i]
+
+    for p in d[k]:
+        # Combine this parameter with another parameter
+        p = {k : p}
+        for p_next in cart_product(d, i+1):
+            yield {**p, **p_next}
+
+
+
+
 class ParameterGrid(Parameters):
 
     @classmethod
     def from_args(cls, args):
         p = ParameterGrid()
         d = args
-        c = 0
-        for k, i in d.items():
-            c+=len(i)
-            setattr(p, k, i)
         setattr(p, "grid", d)
-        setattr(p, "cart_product", itertools.product(*p.grid.values()))
-        setattr(p, "size", c)
+        setattr(p, "cart_product", list(cart_product(p.grid)))
         return p
 
     @classmethod
@@ -192,13 +211,10 @@ class ParameterGrid(Parameters):
         :return:
         """
         for params in self.cart_product:
-            parameters = {}
-            for k, p in zip(self.grid.keys(), params):
-                parameters[k] = p
-            yield Parameters.from_args(parameters)
+            yield Parameters.from_args(params)
 
     def __len__(self):
-        return self.size
+        return len(self.cart_product)
 
 class Callback(object):
 
