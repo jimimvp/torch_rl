@@ -42,11 +42,26 @@ class GaussianPolicy(Policy):
 
         for dist in self.gauss_dists:
             res.append(dist.rsample())
-
-        self.sampled = tor.stack(res)
+        self.sampled = tor.stack(res, -1)
+        self.sampled = self.sampled.view(-1, x.shape[1] / 2)
         x = self.sampled
         self.out = x
         return x
+
+
+
+# Test
+#import numpy as np
+#architecture = [100, 10]
+#gauss_policy = GaussianPolicy(architecture=architecture)
+
+#loss = 0
+#for i in range(20):
+#    res = gauss_policy.forward(to_tensor(np.random.normal(0,1,(5,100)), cuda=False))
+#    loss += tor.sum(res)
+#    print(res.data.cpu())
+
+#loss.backward()
 
 
 
