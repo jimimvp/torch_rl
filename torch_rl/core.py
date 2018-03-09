@@ -12,6 +12,7 @@ def return_output(action):
     return action
 
 
+
 class Agent(Module):
     """
         Wrapper for neural networks for more convenient use
