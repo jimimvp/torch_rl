@@ -82,7 +82,9 @@ class RingBuffer(object):
             for i in range(0, self.start):
                 yield self[i]
 
-
+    def clear(self):
+        self.start = 0
+        self.length = 0
 
 def zeroed_observation(observation):
     if hasattr(observation, 'shape'):
@@ -135,6 +137,15 @@ class Memory(object):
             'ignore_episode_boundaries': self.ignore_episode_boundaries,
         }
         return config
+
+
+    def clear(self):
+        for i in dir(self):
+            a = getattr(self, i)
+            if isinstance(a, RingBuffer):
+                a.clear()
+            elif isinstance(a, list):
+                a = []
 
 
 
