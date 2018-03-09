@@ -1,7 +1,14 @@
-from torch_rl.training.core import Trainer
+from torch_rl.training.core import HorizonTrainer, mse_loss
 import copy
+from torch_rl.memory import GeneralisedSequentialMemory
+from torch.optim import Adam
+from torch_rl.utils import to_tensor
+from torch.autograd import Variable
+import torch as tor
+import numpy as np
+from tqdm import tqdm
 
-class PPOTrainer(Trainer):
+class PPOTrainer(HorizonTrainer):
 
 
     """
@@ -14,30 +21,24 @@ class PPOTrainer(Trainer):
 
 ***REMOVED***
 
-    def __init__(self, env, actor, critic, num_episodes=2000, max_episode_len=500, batch_size=32, gamma=.99,
-***REMOVED***
-***REMOVED***
-***REMOVED***
+    def __init__(self, env, network, network_old, num_episodes=2000, max_episode_len=500, batch_size=32, gamma=.99,
+              replay_memory=GeneralisedSequentialMemory(1000000, window_length=1), lr=1e-4, memory_fill_steps=300,
+                 epsilon=1.,optimizer=None, gae_param=0.95):
         super(PPOTrainer, self).__init__(env)
-        if exploration_process is None:
-            self.random_process = OrnsteinUhlenbeckActionNoise(self.env.action_space.shape[0])
-***REMOVED***
-            self.random_process = exploration_process
-        self.lr_critic = lr_critic
+        self.lr = lr
         self.num_episodes = num_episodes
         self.batch_size = batch_size
         self.replay_memory = replay_memory
         self.max_episode_len = max_episode_len
         self.epsilon = epsilon
-        self.warmup = warmup
         self.gamma = gamma
-        self.optimizer_actor = Adam(actor.parameters(), lr=lr_actor) if optimizer_actor is None else optimizer_actor
-        self.optimizer_critic = Adam(critic.parameters(), lr=lr_critic) if optimizer_critic is None else optimizer_critic
+        self.gae_param = gae_param
+        self.optimizer_actor = Adam(network.parameters(), lr=lr) if optimizer is None else optimizer
         self.goal_based = hasattr(env, "goal")
-
-        self.old_actor = copy.deepcopy(actor)
-        self.old_agent = ActorCriticAgent(self.target_actor,self.target_critic)
-        self.agent = ActorCriticAgent(actor, critic)
+        self.memory_fill_steps = memory_fill_steps
+        self.network = network
+        self.network_old = network_old
+        self.N = 10
 
     def add_to_replay_memory(self,s,a,r,d):
 ***REMOVED***
@@ -45,72 +46,127 @@ class PPOTrainer(Trainer):
 ***REMOVED***
             self.replay_memory.append(self.state, a, r, d, training=True)
 
+    def _episode_end(self):
+***REMOVED***
+***REMOVED***
+***REMOVED***
+    def _episode_step(self):
 ***REMOVED***
 
-        for i in range(self.warmup):
-            a = self.env.action_space.sample()
-***REMOVED***
-            self.add_to_replay_memory(self.state, a, r, d)
-***REMOVED***
+    def gather_experience_and_calc_advantages(self):
+        states = []
+        actions = []
+        rewards = []
+        values = []
+        returns = []
+        advantages = []
+        terminal = []
+        acc_reward  = 0
+        self.episode_length = 0
+        for i in tqdm(range(self.memory_fill_steps)):
+            states.append(self.state)
+            action, value = self.network(to_tensor(self.state).view(1,-1))
+            actions.append(action)
+            values.append(value)
 
-***REMOVED***
+            env_action = action.data.squeeze().numpy()
+            state, reward, done, _ = self.env.step(env_action)
+            self.episode_length += 1
+            acc_reward += reward
 
-***REMOVED***
+***REMOVED***tate
+            done = (done or self.episode_length >= self.max_episode_len)
+            terminal.append(done)
+            if done:
+                self.env.reset()
 
-***REMOVED***
-***REMOVED***
-            action = self.agent.action(np.hstack((self.state, self.env.goal))).cpu().data.numpy()
-***REMOVED***
-            action = self.agent.action(self.state).cpu().data.numpy()
+            reward = max(min(reward, 1), -1)
+            rewards.append(reward)
 
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
+            R = tor.zeros(1, 1)
+            if not done:
+                self.mvavg_reward.append(acc_reward)
+                acc_reward = 0
+                action, value = self.network(to_tensor(state).view(1,-1))
+                R = value.data
+            R = Variable(R)
+            values.append(R)
 
-***REMOVED***
+            A = Variable(tor.zeros(1, 1))
+            for i in reversed(range(len(rewards))):
+                td = rewards[i] + self.gamma * values[i + 1].data - values[i].data
+                A = float(td) + self.gamma * self.gae_param * A
+                advantages.insert(0, A)
+                R = A + values[i]
+                returns.insert(0, R)
 
-        self.add_to_replay_memory(self.state, action, reward, done)
-***REMOVED***
-
-***REMOVED***
-***REMOVED***
-            s1, g, a1, r, s2, terminal = self.replay_memory.sample_and_split(self.batch_size)
-***REMOVED***
-***REMOVED***
-***REMOVED***
-            s1, a1, r, s2, terminal = self.replay_memory.sample_and_split(self.batch_size)
+            for i, s in enumerate(states):
+                self.replay_memory.append(s, actions[i], rewards[i], terminal[i], [returns[i], advantages[i]])
 
 
-***REMOVED***
+    def sample_and_update(self):
+        av_loss = 0
+        self.network_old.load_state_dict(self.network.state_dict())
+        for step in tqdm(range(self.N)):
+            # cf https://github.com/openai/baselines/blob/master/baselines/pposgd/pposgd_simple.py
+            batch_states, batch_actions, batch_rewards, batch_states1, batch_terminals, extra = \
+                self.replay_memory.sample_and_split(self.batch_size)
 
-***REMOVED***
-***REMOVED***
 
-***REMOVED***
-***REMOVED***
+            batch_returns = extra[:, 0]
+            batch_advantages = extra[:, 1]
 
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
+            # old probas
+            actions_old, v_pred_old = self.network_old(batch_states.detach())
+            probs_old = self.network_old.log_prob(batch_actions)
 
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
+            # new probabilities
+            actions, v_pred = self.network(batch_states)
+            probs = self.agent.policy_network.log_prob(batch_actions)
 
-***REMOVED***
-***REMOVED***
-***REMOVED***
+            # ratio
+            ratio = probs / (1e-15 + probs_old)
+            # clip loss
+            surr1 = ratio * tor.stack([batch_advantages] * batch_actions.shape[1],
+                                      1)  # surrogate from conservative policy iteration
+            surr2 = ratio.clamp(1 - self.epsilon, 1 + self.epsilon) * tor.stack(
+                [batch_advantages] * batch_actions.shape[1], 1)
+            loss_clip = -tor.mean(tor.min(surr1, surr2))
+            # value loss
+            vfloss1 = (v_pred - batch_returns) ** 2
+            v_pred_clipped = v_pred_old + (v_pred - v_pred_old).clamp(-self.epsilon, self.epsilon)
+            vfloss2 = (v_pred_clipped - batch_returns) ** 2
+            loss_value = 0.5 * tor.mean(tor.max(vfloss1, vfloss2))  # also clip value loss
+            # entropy
+            loss_ent = -self.ent_coeff * tor.mean(np.e * probs * probs)
+            # total
+            total_loss = (loss_clip + loss_value + loss_ent)
+            av_loss += total_loss.data[0] / float(self.num_episodes)
+            # before Adam step, update old_model:
 
-***REMOVED***
-***REMOVED***
+            # model_old.load_state_dict(model.state_dict())
+            # step
+            self.optimizer.zero_grad()
+            # model.zero_grad()
+            total_loss.backward()
+            self.optimizer.step()
+            self.replay_memory.clear()
 
-***REMOVED***
+    def _horizon_step(self):
 
-***REMOVED***
-***REMOVED***
+        self.gather_experience_and_calc_advantages()
+        self.sample_and_update()
 
+
+from torch_rl.envs.wrappers import *
+import gym
+from torch_rl.models.ppo import PPOGaussianPolicy
+
+env = NormalisedObservationsWrapper(
+    NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+
+network = PPOGaussianPolicy([env.observation_space.shape[0],30, env.action_space.shape[0]*2+1])
+network_old = PPOGaussianPolicy([env.observation_space.shape[0],30, env.action_space.shape[0]*2+1])
+trainer = PPOTrainer(network=network, network_old=network_old, env=env)
+trainer.train(horizon=100000, max_episode_len=500)
 
