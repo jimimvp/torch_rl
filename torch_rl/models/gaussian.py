@@ -25,47 +25,47 @@ class GaussianPolicy(StochasticContinuousPolicy):
             for i, func in enumerate(self.activation_functions):
                 x = func(self.layer_list[i](x))
 ***REMOVED***
-            for i, layer in enumerate(self.layer_list):
+            for i, layer in enumerate(self.layer_list[:-1]):
                 x = self.relu(layer(x))
 
-        i+=1
-        while i < len(self.layer_list):
-            x = self.layer_list[i](x)
-            i+=1
+        x = self.layer_list[-1](x)
 
+        #Last layer is partially tanh and partially softmax
 
-        self.dist_parameters = x
+        self.means = self.tanh(x[None,:int(x.shape[1]/2)])
+        self.sigmas = self.softmax(x[None, int(x.shape[1]/2):])
+        self.dist = Normal(self.means, self.sigmas)
 
-        res = []
-
-        self.gauss_dists = tor.stack([Normal(x,y) for x,y in x.view(-1,2)])
-
-        for dist in self.gauss_dists:
-            res.append(dist.rsample())
-        self.sampled = tor.stack(res, -1)
-        self.sampled = self.sampled.view(-1, x.shape[1] / 2)
+        self.sampled = self.dist.rsample()
         x = self.sampled
         self.out = x
         return x
 
 
+    def sigma(self):
+
+        return self.sigmas
+
+    def mu(self):
+        return self.means
+
+    def log_prob(self, values):
+        return self.dist.log_prob(values)
 
 
 
 
-# Test
-#import numpy as np
-#architecture = [100, 10]
-#gauss_policy = GaussianPolicy(architecture=architecture)
-
-#loss = 0
-#for i in range(20):
-#    res = gauss_policy.forward(to_tensor(np.random.normal(0,1,(5,100)), cuda=False))
-#    loss += tor.sum(res)
-#    print(res.data.cpu())
-
-#loss.backward()
-
-
-
-
+# #Test
+# import numpy as np
+# architecture = [6, 10]
+# gauss_policy = GaussianPolicy(architecture=architecture)
+#
+# loss = 0
+# for i in range(100):
+#     res = gauss_policy.forward(to_tensor(np.random.normal(3,1,(5,6)), cuda=False))
+#     sigma = gauss_policy.sigma()
+#     mean = gauss_policy.mu()
+#     loss += tor.sum(res)
+#     print(sigma, mean)
+#
+# loss.backward()
