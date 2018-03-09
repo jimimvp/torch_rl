@@ -42,7 +42,7 @@ class GoalEnvWrapper(gym.RewardWrapper):
 
     def reset(self, **kwargs):
         self._s = super(GoalEnvWrapper, self).reset(**kwargs)
-        self._goal = self.observation_space.sample()[self.indices]
+        self._goal = self.observation_space.sample()[self.indices] if not hasattr(self, 'new_target') else self.new_target()
         return self._s
 
     def _step(self, action):
@@ -79,3 +79,36 @@ class SparseRewardGoalEnv(GoalEnvWrapper):
             return 1
 
 
+
+class ShapedRewardGoalEnv(GoalEnvWrapper):
+    """
+    Wrapper that creates sparse rewards 0 and 1 for the environment.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self.precision = kwargs.get("precision", 1e-2)
+        del kwargs['precision']
+        super(ShapedRewardGoalEnv, self).__init__(*args, **kwargs)
+        if not wrapped_by(self.env, NormalisedObservationsWrapper):
+            self.normalising_factor = self.observation_space.high - self.observation_space.low
+***REMOVED***
+            self.normalising_factor = 2.
+
+    def _reward(self, reward):
+        if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
+            return -np.sum(np.abs(self._goal - self._s[self.indices])/self.normalising_factor/len(self.indices))
+***REMOVED***
+            return 1
+
+
+
+
+class OsimArmWrapper(gym.ObservationWrapper):
+    """
+    Wrapper that wraps the Stanford OpenSim environment to make it gym standard.
+    """
+
+
+
+    def _observation(self, observation):
+        return observation[2:]
