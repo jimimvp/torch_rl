@@ -1,11 +1,11 @@
-from torch_rl.models.core import Policy
+from torch_rl.models.core import Policy, StochasticContinuousPolicy
 from torch_rl.utils import gauss_weights_init
 from torch import nn
 from torch.distributions import Normal
 import torch as tor
 from torch_rl.utils import to_tensor
 
-class GaussianPolicy(Policy):
+class GaussianPolicy(StochasticContinuousPolicy):
 
     def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),activation_functions=None):
         super(GaussianPolicy, self).__init__()
@@ -38,7 +38,7 @@ class GaussianPolicy(Policy):
 
         res = []
 
-        self.gauss_dists = [Normal(x,y) for x,y in x.view(-1,2)]
+        self.gauss_dists = tor.stack([Normal(x,y) for x,y in x.view(-1,2)])
 
         for dist in self.gauss_dists:
             res.append(dist.rsample())
@@ -47,6 +47,9 @@ class GaussianPolicy(Policy):
         x = self.sampled
         self.out = x
         return x
+
+
+
 
 
 

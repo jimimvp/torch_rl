@@ -28,6 +28,20 @@ class StochasticPolicy(Policy):
         return action
 
 
+class StochasticContinuousPolicy(Policy):
+
+
+    def __init__(self):
+        super(StochasticContinuousPolicy, self).__init__()
+
+
+    def sigma(self):
+***REMOVED***
+
+    def mu(self):
+***REMOVED***
+
+
 
 
 class SimpleNetwork(Policy):
