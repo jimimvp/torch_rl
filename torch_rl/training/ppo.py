@@ -23,7 +23,7 @@ class PPOTrainer(HorizonTrainer):
 
     def __init__(self, env, network, network_old, num_episodes=2000, max_episode_len=500, batch_size=32, gamma=.99,
               replay_memory=GeneralisedSequentialMemory(1000000, window_length=1), lr=1e-4, memory_fill_steps=300,
-                 epsilon=1.,optimizer=None, gae_param=0.95):
+                 epsilon=1.,optimizer=None, lmda=0.95, ent_coeff=0.2):
         super(PPOTrainer, self).__init__(env)
         self.lr = lr
         self.num_episodes = num_episodes
@@ -32,13 +32,14 @@ class PPOTrainer(HorizonTrainer):
         self.max_episode_len = max_episode_len
         self.epsilon = epsilon
         self.gamma = gamma
-        self.gae_param = gae_param
-        self.optimizer_actor = Adam(network.parameters(), lr=lr) if optimizer is None else optimizer
+        self.lmda = lmda
+        self.optimizer = Adam(network.parameters(), lr=lr) if optimizer is None else optimizer
         self.goal_based = hasattr(env, "goal")
         self.memory_fill_steps = memory_fill_steps
         self.network = network
         self.network_old = network_old
         self.N = 10
+        self.ent_coeff = ent_coeff
 
     def add_to_replay_memory(self,s,a,r,d):
 ***REMOVED***
@@ -95,13 +96,14 @@ class PPOTrainer(HorizonTrainer):
             A = Variable(tor.zeros(1, 1))
             for i in reversed(range(len(rewards))):
                 td = rewards[i] + self.gamma * values[i + 1].data - values[i].data
-                A = float(td) + self.gamma * self.gae_param * A
+                A = td + self.gamma * self.lmda * A
                 advantages.insert(0, A)
                 R = A + values[i]
                 returns.insert(0, R)
 
             for i, s in enumerate(states):
-                self.replay_memory.append(s, actions[i], rewards[i], terminal[i], [returns[i], advantages[i]])
+                self.replay_memory.append(s, actions[i].data.numpy(), rewards[i], terminal[i],
+                                          [returns[i].data.numpy(), advantages[i].data.numpy()])
 
 
     def sample_and_update(self):
@@ -113,8 +115,10 @@ class PPOTrainer(HorizonTrainer):
                 self.replay_memory.sample_and_split(self.batch_size)
 
 
-            batch_returns = extra[:, 0]
-            batch_advantages = extra[:, 1]
+            batch_returns = to_tensor(extra[:, 0])
+            batch_advantages = to_tensor(extra[:, 1])
+            batch_states = to_tensor(batch_states)
+            batch_actions = to_tensor(batch_actions)
 
             # old probas
             actions_old, v_pred_old = self.network_old(batch_states.detach())
@@ -122,7 +126,7 @@ class PPOTrainer(HorizonTrainer):
 
             # new probabilities
             actions, v_pred = self.network(batch_states)
-            probs = self.agent.policy_network.log_prob(batch_actions)
+            probs = self.network.log_prob(batch_actions)
 
             # ratio
             ratio = probs / (1e-15 + probs_old)
@@ -150,7 +154,7 @@ class PPOTrainer(HorizonTrainer):
             # model.zero_grad()
             total_loss.backward()
             self.optimizer.step()
-            self.replay_memory.clear()
+        self.replay_memory.clear()
 
     def _horizon_step(self):
 
@@ -160,13 +164,13 @@ class PPOTrainer(HorizonTrainer):
 
 from torch_rl.envs.wrappers import *
 import gym
-from torch_rl.models.ppo import PPOGaussianPolicy
+from torch_rl.models.ppo import PPONetwork
 
 env = NormalisedObservationsWrapper(
     NormalisedActionsWrapper(gym.make("Pendulum-v0")))
 
-network = PPOGaussianPolicy([env.observation_space.shape[0],30, env.action_space.shape[0]*2+1])
-network_old = PPOGaussianPolicy([env.observation_space.shape[0],30, env.action_space.shape[0]*2+1])
+network = PPONetwork([env.observation_space.shape[0],30, env.action_space.shape[0]*2+1])
+network_old = PPONetwork([env.observation_space.shape[0],30, env.action_space.shape[0]*2+1])
 trainer = PPOTrainer(network=network, network_old=network_old, env=env)
 trainer.train(horizon=100000, max_episode_len=500)
 
