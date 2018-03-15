@@ -21,6 +21,15 @@ class Trainer(object):
     def __init__(self, env):
         self.env = env
         self.state = self.env.reset()
+        self.mvavg_reward = deque(maxlen=100)
+        self.callbacks = []
+        self.acc_reward = 0
+
+        self.estep = 0
+        self.episode = 0
+
+        self.verbose = True
+        self.render = False
 
     def train(self, num_episodes, max_episode_len, render=False, verbose=True, callbacks=[]):
         mvavg_reward = deque(maxlen=100)
@@ -75,50 +84,51 @@ class HorizonTrainer(Trainer):
     """
     def __init__(self, env):
         super(HorizonTrainer, self).__init__(env)
+        self.hstep = 0
+        self.horizon = 1000000
 
     def train(self, horizon, max_episode_len, render=False, verbose=True, callbacks=[]):
-        self.mvavg_reward = deque(maxlen=100)
-        episode = 0
+        self.callbacks = callbacks
+        self.estep = 0
+        self.episode = 0
 
         self._warmup()
         self.verbose = True
-
-        estep = 1
-        acc_reward = 0
-
+        self.render = render
 
         self.state = self.env.reset()
-        self._episode_start()
-        for hstep in range(horizon):
+        for self.hstep in range(horizon):
 
             self._horizon_step()
-            # acc_reward += r
-            if render:
-                    self.env.render()
-            # if not d or estep > max_episode_len:
-            #     self._episode_end()
-            #     self.state = self.env.reset()
-            #     estep = 0
-            #     acc_reward = 0
-            #     t_episode_start = time.time()
-            #     self._episode_start()
-            #
-            #     # TODO implement these callbacks a bit better
-            #     for callback in callbacks:
-            #         if hasattr(callback, "episode_step"):
-            #             callback.episode_step(episode=episode, step=estep, episode_reward=acc_reward)
-            #     self._episode_end(episode)
-            #
-            # if verbose:
-            #     prRed("#Training time: {:.2f} minutes".format(time.clock() / 60))
-            #     prGreen(
-            #         "#Horizon step {}/. Mvavg reward: {:.2f}" \
-            #         .format(hstep, np.mean(self.mvavg_reward)))
 
+
+    def _episode_end(self):
+
+        # TODO implement these callbacks a bit better
+        for callback in self.callbacks:
+            if hasattr(callback, "episode_step"):
+                callback.episode_step(episode=self.episode, step=self.estep, episode_reward=self.acc_reward)
+
+        if self.verbose:
+            prRed("#Training time: {:.2f} minutes".format(time.clock() / 60))
+            prGreen(
+                "#Horizon step {}/{} Episode {} Mvavg reward: {:.2f}" \
+                    .format(self.hstep, self.horizon, self.episode, np.mean(self.mvavg_reward)))
+
+    def _episode_step(self, s, a, r, d):
+        if self.render:
+            self.env.render()
+        self.acc_reward += r
+        self.mvavg_reward.append(self.acc_reward)
+        if d:
+            self.acc_reward = 0
+            self._episode_end()
+            self.estep = 0
+            self.acc_reward = 0
+            self.episode+=1
 
     def _horizon_step(self):
 ***REMOVED***
-
 
 
 def reward_transform(env, obs, r, done, **kwargs):
