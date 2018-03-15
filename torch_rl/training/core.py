@@ -36,7 +36,7 @@ class Trainer(object):
         self._warmup()
         self.verbose = True
         for episode in range(num_episodes):
-***REMOVED***elf.env.reset()
+            self.state = self.env.reset()
             t_episode_start = time.time()
             acc_reward = 0
             self._episode_start()
@@ -65,14 +65,14 @@ class Trainer(object):
     def _episode_step(self):
         raise NotImplementedError()
 
-***REMOVED***
+    def _episode_start(self):
         raise NotImplementedError()
 
     def _episode_end(self):
         raise NotImplementedError()
 
-***REMOVED***
-***REMOVED***
+    def _warmup(self):
+        pass
 
 
 
@@ -128,7 +128,7 @@ class HorizonTrainer(Trainer):
             self.episode+=1
 
     def _horizon_step(self):
-***REMOVED***
+        pass
 
 
 def reward_transform(env, obs, r, done, **kwargs):

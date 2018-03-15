@@ -34,7 +34,7 @@ class GoalEnvWrapper(gym.RewardWrapper):
         if "indices" in kwargs:
             self.indices = kwargs.get("indices")
             del kwargs['indices']
-***REMOVED***
+        else:
             self.indices = None
         super(GoalEnvWrapper, self).__init__(*args, **kwargs)
         if self.indices is None:
@@ -69,14 +69,22 @@ class SparseRewardGoalEnv(GoalEnvWrapper):
         super(SparseRewardGoalEnv, self).__init__(*args,**kwargs)
         if not wrapped_by(self.env, NormalisedObservationsWrapper):
             self.normalising_factor = self.observation_space.high - self.observation_space.low
-***REMOVED***
+        else:
             self.normalising_factor = 2.
 
     def _reward(self, reward):
         if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
             return 0
-***REMOVED***
+        else:
             return 1
+
+
+class NormalisedRewardWrapper(gym.RewardWrapper):
+
+
+    def _reward(self, reward):
+        low, high = self.reward_range
+        return ((reward-low)/(high-low)-0.5)*2
 
 
 
@@ -91,13 +99,13 @@ class ShapedRewardGoalEnv(GoalEnvWrapper):
         super(ShapedRewardGoalEnv, self).__init__(*args, **kwargs)
         if not wrapped_by(self.env, NormalisedObservationsWrapper):
             self.normalising_factor = self.observation_space.high - self.observation_space.low
-***REMOVED***
+        else:
             self.normalising_factor = 2.
 
     def _reward(self, reward):
         if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
             return -np.sum(np.abs(self._goal - self._s[self.indices])/self.normalising_factor/len(self.indices))
-***REMOVED***
+        else:
             return 1
 
 

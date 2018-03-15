@@ -25,7 +25,7 @@ class PPONetwork(StochasticContinuousPolicy):
         if self.activation_functions:
             for i, func in enumerate(self.activation_functions):
                 x = func(self.layer_list[i](x))
-***REMOVED***
+        else:
             for i, layer in enumerate(self.layer_list[:-1]):
                 x = self.relu(layer(x))
 
@@ -79,7 +79,7 @@ class RandSigmaPPONetwork(StochasticContinuousPolicy):
         if self.activation_functions:
             for i, func in enumerate(self.activation_functions):
                 x = func(self.layer_list[i](x))
-***REMOVED***
+        else:
             for i, layer in enumerate(self.layer_list[:-1]):
                 x = self.relu(layer(x))
 
@@ -152,7 +152,7 @@ class ActorCriticPPO(StochasticContinuousPolicy):
         if self.activation_functions:
             for i, func in enumerate(self.activation_functions):
                 x = func(self.layer_list[i](x))
-***REMOVED***
+        else:
             for i, layer in enumerate(self.layer_list[:-1]):
                 x = self.relu(layer(x))
 
@@ -174,7 +174,7 @@ class ActorCriticPPO(StochasticContinuousPolicy):
         if self.activation_functions:
             for i, func in enumerate(self.activation_functions):
                 x = func(self.layer_list_val[i](x))
-***REMOVED***
+        else:
             for i, layer in enumerate(self.layer_list_val):
                 x = self.relu(layer(x))
 

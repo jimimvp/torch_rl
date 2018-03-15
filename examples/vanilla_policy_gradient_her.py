@@ -59,7 +59,7 @@ for i in range(num_episodes):
         if j == episode_length or done:
             replay_memory.append(state, goal, action, reward, terminal=True)
             break
-***REMOVED***
+        else:
             replay_memory.append(state, goal, action, reward, terminal=False)
 
     mvr_tracker.append(acc_reward)

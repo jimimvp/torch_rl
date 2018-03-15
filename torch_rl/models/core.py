@@ -12,7 +12,7 @@ class Policy(nn.Module):
         self.softmax = nn.Softmax()
 
     def action(self, x):
-***REMOVED***
+        pass
 
 class StochasticPolicy(Policy):
 
@@ -36,10 +36,10 @@ class StochasticContinuousPolicy(Policy):
 
 
     def sigma(self):
-***REMOVED***
+        pass
 
     def mu(self):
-***REMOVED***
+        pass
 
 
 
@@ -63,7 +63,7 @@ class SimpleNetwork(Policy):
         if self.activation_functions:
             for i, func in enumerate(self.activation_functions):
                 x = func(self.layer_list[i](x))
-***REMOVED***
+        else:
             for i, layer in enumerate(self.layer_list):
                 x = self.relu(layer(x))
 
@@ -80,7 +80,7 @@ class SimpleNetwork(Policy):
 class DDPGCritic(nn.Module):
 
     def __init__(self):
-***REMOVED***
+        pass
 
 
 
@@ -219,7 +219,7 @@ class SimpleSpikingAgent(Agent):
     def action(self, *args, requires_grad=False):
         if len(args) > 1:
             x = np.hstack(args)
-***REMOVED***
+        else:
             x = args[0]
         x = self.spiking_net.forward(x)
         self.spiking_net.reset()
@@ -231,7 +231,7 @@ class SimpleSpikingAgent(Agent):
     def actions(self, *args, requires_grad=False):
         if len(args) > 1:
             x = np.hstack(args)
-***REMOVED***
+        else:
             x = args[0]
         x = self.spiking_net.forward(x)
         self.spiking_net.reset()

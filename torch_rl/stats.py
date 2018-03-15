@@ -28,7 +28,7 @@ class RLTrainingStats(Callback):
 
         if save_destination is None:
             self.save_destination = 'training_stats_' + str(datetime.datetime.now())
-***REMOVED***
+        else:
             self.save_destination = save_destination
 
         if os.path.isdir(self.save_destination):
@@ -37,7 +37,7 @@ class RLTrainingStats(Callback):
             res = res.lower()
             if res == 'y':
                 shutil.rmtree(self.save_destination)
-    ***REMOVED***
+            else:
                 raise Exception("Start training with another save destination name.")
         os.makedirs(self.save_destination)
 
@@ -65,7 +65,7 @@ class RLTrainingStats(Callback):
 
         if not self.step_data is None:
             self.step_data = pd.concat([self.step_data, df])
-***REMOVED***
+        else:
             self.step_data = df
 
         if episode % self.save_rate == 0:
@@ -79,7 +79,7 @@ class RLTrainingStats(Callback):
 
         if not self.episode_data is None:
             self.episode_data = pd.concat([self.episode_data, df])
-***REMOVED***
+        else:
             self.episode_data = df
 
         if episode % self.save_rate == 0:

@@ -21,7 +21,7 @@ class HindsightReplayTest(TestCase):
             if i % 20 == 0:
                 cls.memory.append(cls.episode, 1, 1, 1, True)
                 cls.episode += 1
-    ***REMOVED***
+            else:
                 cls.memory.append(cls.episode, 1, 1, 1, False)
     def test_append(self):
         self.memory.append(0,1,1,1,1,False)

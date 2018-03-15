@@ -17,7 +17,7 @@ class TestParameterGrid(unittest.TestCase):
 
     def test_iter(self):
         for parameters in self.grid:
-    ***REMOVED***
+            pass
         assert False in self.grid.reservoir
         assert 400 in self.grid.reservoir
 

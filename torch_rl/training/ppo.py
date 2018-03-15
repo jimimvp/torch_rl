@@ -21,7 +21,7 @@ class PPOTrainer(HorizonTrainer):
 
     """
 
-***REMOVED***
+    critic_criterion = mse_loss
 
     def __init__(self, env, network, network_old, num_episodes=2000, max_episode_len=500, batch_size=64, gamma=.99,
                  replay_memory=GeneralisedlMemory(10000, window_length=1), lr=1e-4, memory_fill_steps=10000,
@@ -55,9 +55,9 @@ class PPOTrainer(HorizonTrainer):
 
 
     def add_to_replay_memory(self,s,a,r,d):
-***REMOVED***
+        if self.goal_based:
             self.replay_memory.append(self.state, self.env.goal, a, r, d, training=True)
-***REMOVED***
+        else:
             self.replay_memory.append(self.state, a, r, d, training=True)
 
 
@@ -75,7 +75,7 @@ class PPOTrainer(HorizonTrainer):
             episode_length += 1
             acc_reward += reward
 
-***REMOVED***tate
+            self.state = state
             done = done or episode_length >= self.max_episode_len
             self.adv_terminal[i] = done
 
@@ -176,7 +176,7 @@ class DPPOTrainer(HorizonTrainer):
 
     """
 
-***REMOVED***
+    critic_criterion = mse_loss
 
     def __init__(self, env, network, network_old, num_episodes=2000, max_episode_len=500, batch_size=64, gamma=.99,
                  replay_memory=GeneralisedlMemory(12000, window_length=1), lr=1e-3, memory_fill_steps=2048,
@@ -203,9 +203,9 @@ class DPPOTrainer(HorizonTrainer):
 
         # Convenience buffers for faster iteration over advantage calculation
     def add_to_replay_memory(self,s,a,r,d):
-***REMOVED***
+        if self.goal_based:
             self.replay_memory.append(self.state, self.env.goal, a, r, d, training=True)
-***REMOVED***
+        else:
             self.replay_memory.append(self.state, a, r, d, training=True)
 
 

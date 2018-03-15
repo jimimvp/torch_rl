@@ -219,8 +219,8 @@ class ParameterGrid(Parameters):
 class Callback(object):
 
     def step(self, *args, **kwargs):
-***REMOVED***
+        pass
 
     def episode_step(self, *args, **kwargs):
-***REMOVED***
+        pass
 

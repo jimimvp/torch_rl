@@ -107,7 +107,7 @@ class HindsightMemory(Memory):
 
 
 
-class***REMOVED***HindsightMemory(HindsightMemory):
+class SpikingHindsightMemory(HindsightMemory):
     """
         Implementation of replay memory for hindsight experience replay with future
         transition sampling.

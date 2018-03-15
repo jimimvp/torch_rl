@@ -94,7 +94,7 @@ class SequentialMemory(Memory):
 
         if self.goals.length > 0:
             return state0_batch, goal_batch, action_batch, reward_batch, state1_batch, terminal1_batch
-***REMOVED***
+        else:
             return state0_batch, action_batch, reward_batch, state1_batch, terminal1_batch
 
     def _append(self, observation, action, reward, terminal, training=True):
@@ -237,7 +237,7 @@ class GeneralisedlMemory(SequentialMemory):
 
         if self.goals.length > 0:
             return state0_batch, goal_batch, action_batch, reward_batch, state1_batch, terminal1_batch
-***REMOVED***
+        else:
             return state0_batch, action_batch, reward_batch, state1_batch, terminal1_batch, extra_info_batch
 
 

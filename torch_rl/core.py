@@ -43,7 +43,7 @@ class Agent(Module):
             out = self.forward(x)
             self.out = out[0]
             return out[0]
-***REMOVED***
+        else:
             x = args[0]
             x = np.expand_dims(x, 0)
             x = to_tensor(x, **kwargs)
@@ -63,12 +63,12 @@ class Agent(Module):
                 if not tor.is_tensor(args[0]):
                     x = np.hstack(args)
                     x = to_tensor(x, **kwargs)
-        ***REMOVED***
+                else:
                     x = tor.cat(args, 1)
             out = self.forward(x)
             self.out = out
             return out
-***REMOVED***
+        else:
             x = args[0]
             x = to_tensor(x, **kwargs)
             out = self.forward(x)
@@ -108,7 +108,7 @@ class ActorCriticAgent(Agent):
             out = self.critic_forward(x)
             self.out = out[0]
             return out[0]
-***REMOVED***
+        else:
             x = args[0]
             x = np.expand_dims(x, 0)
             x = to_tensor(x, **kwargs)
@@ -128,12 +128,12 @@ class ActorCriticAgent(Agent):
             if not tor.is_tensor(args[0].data):
                 x = np.hstack(args)
                 x = to_tensor(x, **kwargs)
-    ***REMOVED***
+            else:
                 x = tor.cat(args, 1)
             out = self.critic_forward(x)
             self.out = out
             return out
-***REMOVED***
+        else:
             x = args[0]
             if not tor.is_tensor(x.data):
                 x = to_tensor(x, **kwargs)
@@ -143,7 +143,7 @@ class ActorCriticAgent(Agent):
 
 
 
-class***REMOVED***Network(object):
+class SpikingNetwork(object):
     """
        A similar interface to pytorch for easier plug-in.
     """
