@@ -132,10 +132,10 @@ class SequentialMemory(Memory):
 
 
 
-class GeneralisedSequentialMemory(SequentialMemory):
+class GeneralisedlMemory(SequentialMemory):
 
     def __init__(self, limit,**kwargs):
-        super(GeneralisedSequentialMemory, self).__init__(limit, **kwargs)
+        super(GeneralisedlMemory, self).__init__(limit, **kwargs)
         self.extra_info = RingBuffer(limit)
         self.limit = limit
 
@@ -196,7 +196,7 @@ class GeneralisedSequentialMemory(SequentialMemory):
         return experiences
 
     def _append(self, observation, action, reward, terminal, extra_info, training=True):
-            super(SequentialMemory, self).append(observation, action, reward, terminal, training=training)
+            super(SequentialMemory, self).append(observation, action, reward, False, training=training)
 
             # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
             # and weather the next state is `terminal` or not.
@@ -225,7 +225,7 @@ class GeneralisedSequentialMemory(SequentialMemory):
             reward_batch.append(e[2])
             action_batch.append(e[3])
             terminal1_batch.append(0. if e[4] else 1.)
-            extra_info.append(experiences[-1])
+            extra_info.append(e[-1])
 
         # Prepare and validate parameters.
         state0_batch = np.array(state0_batch).reshape(batch_size, -1)
