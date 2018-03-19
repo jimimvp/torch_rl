@@ -5,7 +5,7 @@ from torch_rl.envs import NormalisedActionsWrapper
 from torch_rl.memory import SequentialMemory
 from torch_rl.training import DDPGTrainer
 from torch_rl.envs import SparseRewardGoalEnv
-from torch_rl.utils.stats import RLTrainingStats
+from torch_rl.utils.stats import TrainingStatsCallback
 from torch_rl.utils import cuda_if_available, gauss_init
 from torch_rl.utils.callbacks import CheckpointCallback
 from torch_rl.utils import timestamp
@@ -60,7 +60,7 @@ trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
                       lr_actor=actor_learning_rate, lr_critic=critic_learning_rate, warmup=warmup, replay_memory=replay_memory
                       )
 
-stats = RLTrainingStats(save_destination=data_root)
+stats = TrainingStatsCallback(save_destination=data_root)
 checkpoint_callback = CheckpointCallback(save_path=data_root, models={"actor": actor, "critic" : critic})
 
 

@@ -4,7 +4,7 @@ from torch_rl.models import SimpleNetwork, GaussianPolicy
 from torch_rl.envs import NormalisedActionsWrapper, NormalisedObservationsWrapper
 from torch_rl.memory import SequentialMemory,  HindsightMemory
 from torch_rl.training.ie_ddpg import IEDDPGTrainer
-from torch_rl.utils.stats import RLTrainingStats
+from torch_rl.utils.stats import TrainingStatsCallback
 from torch_rl.utils import ParameterGrid, cuda_if_available, gauss_init
 import datetime
 import argparse
@@ -63,7 +63,7 @@ def grid_training(p):
     output_dir = "{}/ddpg".format(ROOT_DIR) + suff + "_" + str(
         datetime.datetime.now()).replace(" ", "_")
 
-    stats = RLTrainingStats(save_destination=output_dir)
+    stats = TrainingStatsCallback(save_destination=output_dir)
     p.to_json(os.path.join(output_dir, "parameters.json"))
 
     trainer.train(EPISODES, max_episode_len=p.max_episode_length, verbose=True, callbacks=[stats])

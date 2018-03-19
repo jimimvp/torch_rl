@@ -7,7 +7,7 @@ from torch_rl.utils import Parameters, prRed, Callback
 import glob
 import shutil
 
-class RLTrainingStats(Callback):
+class TrainingStatsCallback(Callback):
     """
         Keeps training statistics and writes them to a file and loads them.
     """
