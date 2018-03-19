@@ -2,7 +2,7 @@ import torch as tor
 from torch.autograd import Variable
 import numpy as np
 from collections import namedtuple
-
+import datetime
 
 
 def to_tensor(ndarray, volatile=False, requires_grad=False, dtype=tor.FloatTensor, cuda=True):
@@ -101,7 +101,8 @@ def loop_print(prt, r):
         yield i
 
 
-
+def timestamp():
+    return datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 
 
 
@@ -216,6 +217,8 @@ class ParameterGrid(Parameters):
     def __len__(self):
         return len(self.cart_product)
 
+
+
 class Callback(object):
 
     def step(self, *args, **kwargs):
@@ -223,4 +226,16 @@ class Callback(object):
 
     def episode_step(self, *args, **kwargs):
         pass
+
+
+
+
+
+
+
+
+
+
+
+
 
