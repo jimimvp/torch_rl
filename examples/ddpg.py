@@ -7,6 +7,9 @@ from torch_rl.training import DDPGTrainer
 from torch_rl.envs import SparseRewardGoalEnv
 from torch_rl.utils.stats import RLTrainingStats
 from torch_rl.utils import cuda_if_available, gauss_init
+from torch_rl.utils.callbacks import CheckpointCallback
+from torch_rl.utils import timestamp
+
 import torch as tor
 
 
@@ -33,7 +36,7 @@ weight_init_sigma = 0.003
 
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
-env = SparseRewardGoalEnv(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+env = SparseRewardGoalEnv(NormalisedActionsWrapper(gym.make("Pendulum-v0")), precision=1e-1)
 env.reset()
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]*2
@@ -49,12 +52,17 @@ critic = cuda_if_available(
 actor.apply(gauss_init(0, weight_init_sigma))
 critic.apply(gauss_init(0, weight_init_sigma))
 
+data_root = "/Users/Jimmy/Data/ddpg_" + timestamp()
+
 # Training
 trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
                       tau=tau, epsilon=epsilon, batch_size=batch_size, depsilon=depsilon, gamma=gamma,
                       lr_actor=actor_learning_rate, lr_critic=critic_learning_rate, warmup=warmup, replay_memory=replay_memory
                       )
 
-stats = RLTrainingStats(save_destination="/disk/no_backup/vlasteli/Projects/torch_rl/examples/ddpg_" + str(datetime.datetime.now()).replace(" ", "_"))
+stats = RLTrainingStats(save_destination=data_root)
+checkpoint_callback = CheckpointCallback(save_path=data_root, models={"actor": actor, "critic" : critic})
 
-trainer.train(2000, max_episode_len=500, verbose=True, callbacks=[stats])
+
+
+trainer.train(2000, max_episode_len=500, verbose=True, callbacks=[stats, checkpoint_callback])
