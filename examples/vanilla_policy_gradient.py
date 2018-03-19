@@ -9,6 +9,7 @@ from torch_rl.utils import *
 
 from torch_rl.models import SimpleNetwork
 from torch_rl.core import Agent
+import random
 
 """
     Implementation of vanilla policy gradient with experience replay.

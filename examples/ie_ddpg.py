@@ -1,16 +1,15 @@
 import gym
-from torch_rl.utils import *
 
 from torch_rl.models import SimpleNetwork, GaussianPolicy
 from torch_rl.envs import NormalisedActionsWrapper, NormalisedObservationsWrapper
 from torch_rl.memory import SequentialMemory,  HindsightMemory
 from torch_rl.training.ie_ddpg import IEDDPGTrainer
-from torch_rl.envs import SparseRewardGoalEnv
-from torch_rl.stats import RLTrainingStats
-from torch_rl.utils import ParameterGrid
+from torch_rl.utils.stats import RLTrainingStats
+from torch_rl.utils import ParameterGrid, cuda_if_available, gauss_init
 import datetime
 import argparse
 import os
+import numpy as np
 """
     Implementation of deep deterministic policy gradients with soft updates.
 
