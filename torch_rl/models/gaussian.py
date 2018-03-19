@@ -1,11 +1,11 @@
-from torch_rl.models.core import Policy, StochasticContinuousPolicy
+from torch_rl.models.core import NeuralNet, StochasticContinuousNeuralNet
 from torch_rl.utils import gauss_weights_init
 from torch import nn
 from torch.distributions import Normal
 import torch as tor
 from torch_rl.utils import to_tensor
 
-class GaussianPolicy(StochasticContinuousPolicy):
+class GaussianPolicy(StochasticContinuousNeuralNet):
 
     def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),activation_functions=None):
         super(GaussianPolicy, self).__init__()

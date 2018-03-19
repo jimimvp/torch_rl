@@ -1,4 +1,4 @@
-from torch_rl.models.core import Policy, StochasticContinuousPolicy
+from torch_rl.models.core import NeuralNet, StochasticContinuousNeuralNet
 from torch_rl.utils import gauss_weights_init
 from torch import nn
 from torch.distributions import Normal, Uniform
@@ -6,7 +6,7 @@ import numpy as np
 from torch_rl.utils import to_tensor
 import torch as tor
 
-class PPONetwork(StochasticContinuousPolicy):
+class PPONetwork(StochasticContinuousNeuralNet):
 
     def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),activation_functions=None):
         super(PPONetwork, self).__init__()
@@ -57,7 +57,7 @@ class PPONetwork(StochasticContinuousPolicy):
         return self.dist.log_prob(values)
 
 
-class RandSigmaPPONetwork(StochasticContinuousPolicy):
+class RandSigmaPPONetwork(StochasticContinuousNeuralNet):
 
     sigma_log_bounds = [-0.7, -1.6]
 
@@ -116,7 +116,7 @@ class RandSigmaPPONetwork(StochasticContinuousPolicy):
 
 
 
-class ActorCriticPPO(StochasticContinuousPolicy):
+class ActorCriticPPO(StochasticContinuousNeuralNet):
 
 
 

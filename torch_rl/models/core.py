@@ -2,11 +2,37 @@ from torch import nn
 from torch_rl.utils import gauss_weights_init
 
 from torch_rl.core import *
+import os
+import glob
+
+class SaveableModel(object):
 
 
-class Policy(nn.Module):
+    def save(self, step, path=None, f=None):
+        name = type(self).__name__ + "_" + str(step) + ".tar" if f is None else f
+        path = os.path.join(path, name)
+        tor.save(self, path)
+
+
+    @classmethod
+    def load(cls, path):
+        return tor.load(path)
+
+
+    @classmethod
+    def load_best(cls, path):
+        assert os.path.isdir(path)
+
+        best_models = glob.glob(os.path.join(path, "*best*"))
+
+        assert not len(best_models > 1)
+
+        return tor.load(os.path.join(path, best_models[0]))
+
+
+class NeuralNet(nn.Module, SaveableModel):
     def __init__(self):
-        super(Policy, self).__init__()
+        super(NeuralNet, self).__init__()
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
         self.softmax = nn.Softmax()
@@ -14,10 +40,13 @@ class Policy(nn.Module):
     def action(self, x):
         pass
 
-class StochasticPolicy(Policy):
+
+
+
+class StochasticNeuralNet(NeuralNet):
 
     def __init__(self):
-        super(StochasticPolicy, self).__init__()
+        super(StochasticNeuralNet, self).__init__()
 
     def sample_action(self, action_distribution=None):
         if not action_distribution:
@@ -28,11 +57,11 @@ class StochasticPolicy(Policy):
         return action
 
 
-class StochasticContinuousPolicy(Policy):
+class StochasticContinuousNeuralNet(NeuralNet):
 
 
     def __init__(self):
-        super(StochasticContinuousPolicy, self).__init__()
+        super(StochasticContinuousNeuralNet, self).__init__()
 
 
     def sigma(self):
@@ -44,7 +73,7 @@ class StochasticContinuousPolicy(Policy):
 
 
 
-class SimpleNetwork(Policy):
+class SimpleNetwork(NeuralNet):
 
     def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),activation_functions=None):
         super(SimpleNetwork, self).__init__()
@@ -77,14 +106,7 @@ class SimpleNetwork(Policy):
 
 
 
-class DDPGCritic(nn.Module):
-
-    def __init__(self):
-        pass
-
-
-
-class PolicyAHG(StochasticPolicy):
+class PolicyAHG(StochasticNeuralNet):
 
     def __init__(self,  input_size, output_size):
         super(PolicyAHG, self).__init__()
@@ -104,7 +126,7 @@ class PolicyAHG(StochasticPolicy):
 
 
 
-class PolicySPG(StochasticPolicy):
+class PolicySPG(StochasticNeuralNet):
 
     def __init__(self,  input_size, output_size):
         super(PolicySPG, self).__init__()

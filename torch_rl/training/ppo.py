@@ -9,6 +9,23 @@ import multiprocessing as mltip
 from torch import multiprocessing as pmltip
 from multiprocessing import Queue, Process
 from tqdm import tqdm
+from collections import deque
+from torch_rl.utils import prGreen
+
+
+def queue_to_array(q):
+    q.put(False)
+    arr = []
+    while True:
+        item = q.get()
+        if item:
+            arr.append(item)
+        else:
+            break
+
+    return np.asarray(arr)
+
+
 
 class PPOTrainer(HorizonTrainer):
 
@@ -42,6 +59,7 @@ class PPOTrainer(HorizonTrainer):
         self.policy_update_epochs = policy_update_epochs
         self.ent_coeff = ent_coeff
         self.num_episodes = 0
+        self.reward_std = deque(maxlen=100)
 
         # Convenience buffers for faster iteration over advantage calculation
 
@@ -200,6 +218,7 @@ class DPPOTrainer(HorizonTrainer):
         self.num_threads = num_threads
         self.sigma_log = -0.7
         self.T = 30
+        self.reward_std = deque(maxlen=100)
 
         # Convenience buffers for faster iteration over advantage calculation
     def add_to_replay_memory(self,s,a,r,d):
@@ -209,8 +228,10 @@ class DPPOTrainer(HorizonTrainer):
             self.replay_memory.append(self.state, a, r, d, training=True)
 
 
+
+
     @staticmethod
-    def gather_experience_and_calc_advantages(network, q, max_episode_len, gamma, lmda, env, step, pid, T, sigma_log):
+    def gather_experience_and_calc_advantages(network, q, reward_q, max_episode_len, gamma, lmda, env, step, pid, T, sigma_log):
         np.random.seed(pid)
         tor.manual_seed(pid)
         env.seed(pid)
@@ -241,7 +262,7 @@ class DPPOTrainer(HorizonTrainer):
                 acc_reward += reward
                 done = done or episode_length >= max_episode_len
 
-                step(state, env_action, reward, done)
+                # step(state, env_action, reward, done)
 
                 #reward = max(min(reward, 1), -1)
                 adv_rewards[i] = reward
@@ -254,6 +275,7 @@ class DPPOTrainer(HorizonTrainer):
                 if done:
                     state = env.reset()
                     episode_length = 0
+                    reward_q.put(acc_reward)
                     #print("Acc reward in episode: ", acc_reward)
                     acc_reward = 0
                     break
@@ -278,11 +300,12 @@ class DPPOTrainer(HorizonTrainer):
         self.network.share_memory()
         processes = []
         experience_queue = Queue()
+        reward_queue = Queue()
         import copy
 
         for i in range(self.num_threads):
             process = mltip.Process(target=DPPOTrainer.gather_experience_and_calc_advantages,
-                                    args=(self.network, experience_queue, self.max_episode_len,
+                                    args=(self.network, experience_queue, reward_queue, self.max_episode_len,
                                           self.gamma, self.lmda, copy.deepcopy(self.env),
                                           self._episode_step, np.random.randint(0,10000), self.T, self.sigma_log))
             processes.append(process)
@@ -293,6 +316,15 @@ class DPPOTrainer(HorizonTrainer):
         for process in processes:
             process.terminate()
 
+
+
+        reward_arr = queue_to_array(reward_queue)
+
+        self.mvavg_reward.append(reward_arr.mean())
+        self.reward_std.append(reward_arr.std())
+
+        prGreen("#Horizon step: {} Average reward: {} "
+                "Reward step average std: {}".format(self.hstep, np.mean(self.mvavg_reward), np.mean(self.reward_std)))
 
 
     def sample_and_update(self):
