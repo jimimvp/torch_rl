@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import os
 import numpy as np
-from torch_rl.utils import Parameters, prRed, Callback
+from torch_rl.utils import Parameters, prRed, Callback, timestamp
 import glob
 import shutil
 
@@ -27,9 +27,9 @@ class TrainingStatsCallback(Callback):
         self.hyperparameters = hyperparameters
 
         if save_destination is None:
-            self.save_destination = 'training_stats_' + str(datetime.datetime.now())
+            self.save_destination = 'training_stats_' + timestamp()
         else:
-            self.save_destination = save_destination
+            self.save_destination = os.path.join(save_destination, "training_stats")
 
         if os.path.isdir(self.save_destination):
             prRed(self.save_destination + " is a directory already, delete for new training data? y/n")
