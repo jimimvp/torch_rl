@@ -8,11 +8,8 @@ import glob
 class SaveableModel(object):
 
 
-    def save(self, step, path=None, f=None):
-        name = type(self).__name__ + "_" + str(step) + ".tar" if f is None else f
-        path = os.path.join(path, name)
+    def save(self, path):
         tor.save(self, path)
-
 
     @classmethod
     def load(cls, path):
