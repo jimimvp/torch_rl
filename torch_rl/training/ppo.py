@@ -396,19 +396,19 @@ class DPPOTrainer(HorizonTrainer):
         self.sigma_log -= 1e-2
 
 
-
-
-from torch_rl.envs.wrappers import *
-import gym
-from torch_rl.models.ppo import ActorCriticPPO
-
-env = NormalisedObservationsWrapper(
-    NormalisedActionsWrapper(gym.make("Pendulum-v0")))
-print(env.reward_range)
-
-
-network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-trainer = DPPOTrainer(network=network, network_old=network_old, env=env)
-trainer.train(horizon=100000, max_episode_len=500)
-
+#
+#
+# from torch_rl.envs.wrappers import *
+# import gym
+# from torch_rl.models.ppo import ActorCriticPPO
+#
+# env = NormalisedObservationsWrapper(
+#     NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+# print(env.reward_range)
+#
+#
+# network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+# network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+# trainer = DPPOTrainer(network=network, network_old=network_old, env=env)
+# trainer.train(horizon=100000, max_episode_len=500)
+#
