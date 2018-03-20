@@ -221,10 +221,22 @@ class ParameterGrid(Parameters):
 
 class Callback(object):
 
+    def __init__(self, episodewise=True, stepwise=False):
+        self.stepwise=stepwise
+        self.episodewise = episodewise
+
     def step(self, *args, **kwargs):
-        pass
+        if self.stepwise:
+            self._step()
 
     def episode_step(self, *args, **kwargs):
+        if self.episodewise:
+            self._episode_step(*args, **kwargs)
+
+    def _step(self, *args, **kwargs):
+        pass
+
+    def _episode_step(self, *args, **kwargs):
         pass
 
 

@@ -9,11 +9,12 @@ import shutil
 
 class TrainingStatsCallback(Callback):
     """
-        Keeps training statistics and writes them to a file and loads them.
+        Keeps training statistics, writes them to a file and loads them.
     """
     def __init__(self, episode_window=10, step_window=10,
                  sample_rate_episodes=1, sample_rate_steps=None, save_rate=10,
-                 save_destination=None, hyperparameters=None):
+                 save_destination=None, hyperparameters=None, stepwise=False, episodewise=True):
+        super(TrainingStatsCallback, self).__init__(episodewise=episodewise, stepwise=stepwise)
 
         self.episode_window = episode_window
         self.episode_reward_buffer = deque(maxlen=episode_window)
@@ -56,7 +57,7 @@ class TrainingStatsCallback(Callback):
             df = pd.DataFrame.from_records(self.hyperparameters.__dict__)
             df.to_pickle(os.path.join(self.save_destination, "parameters.cfg"))
 
-    def step(self, episode, step, reward,**kwargs):
+    def _step(self, episode, step, reward,**kwargs):
         kwargs["reward"] = reward
         kwargs['episode'] = episode
         kwargs['step'] = step
@@ -71,7 +72,7 @@ class TrainingStatsCallback(Callback):
         if episode % self.save_rate == 0:
             self.save()
 
-    def episode_step(self, **kwargs):
+    def _episode_step(self, **kwargs):
         self.episode_reward_buffer.append(kwargs['episode_reward'])
         episode = kwargs['episode']
         kwargs["mvavg_reward"] = np.mean(self.episode_reward_buffer)

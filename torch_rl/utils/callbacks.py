@@ -4,7 +4,7 @@ import os
 class CheckpointCallback(Callback):
 
 
-    def __init__(self, models=None, save_path=".", interval=1):
+    def __init__(self, models=None, save_path=".", interval=1, episodewise=True):
         """
         Init the object
         :param models:      dict of name: model pairs, the names are used for saving
@@ -12,7 +12,7 @@ class CheckpointCallback(Callback):
         :param save_path:   directory where all of the checkpoints are going to be stored in
                             a tree hierarchy.
         """
-
+        super(CheckpointCallback, self).__init__(episodewise=episodewise, stepwise=not episodewise)
         self.models = models
         self.interval = interval
         self.save_path = os.path.join(save_path, "checkpoints")
@@ -23,7 +23,7 @@ class CheckpointCallback(Callback):
             model_dir = os.path.join(self.save_path, k)
             os.makedirs(model_dir)
 
-    def step(self,  *args, **kwargs):
+    def _step(self,  *args, **kwargs):
 
         step = kwargs['step']
         if step % self.interval == 0:
