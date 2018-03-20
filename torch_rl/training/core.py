@@ -42,7 +42,9 @@ class Trainer(object):
             self._episode_start()
 
             for step in range(max_episode_len):
-                s, r, d, _ = self._episode_step(episode, acc_reward)
+                s, r, d, i = self._episode_step(episode, acc_reward)
+                for callback in callbacks:
+                    callback.step(episode=episode, step=step, reward=r, **i)
                 if render:
                     self.env.render()
                 if d:
@@ -71,10 +73,14 @@ class Trainer(object):
     def _episode_end(self):
         raise NotImplementedError()
 
+    def _async_episode_step(self):
+        raise NotImplementedError()
+
     def _warmup(self):
         pass
 
 
+from multiprocessing import Lock
 
 class HorizonTrainer(Trainer):
     """
@@ -82,10 +88,15 @@ class HorizonTrainer(Trainer):
     implementing the functionality in case that information has to be used between episodes
     consecutively for a more intuitive implementation.
     """
-    def __init__(self, env):
+    def __init__(self, env, num_threads=1):
         super(HorizonTrainer, self).__init__(env)
         self.hstep = 0
         self.horizon = 1000000
+        self.num_threads = num_threads
+        self.l = Lock()
+        self.le = Lock()
+        self.async_steps = 0
+        self.async_episode_steps = 0
 
     def train(self, horizon, max_episode_len, render=False, verbose=True, callbacks=[]):
         self.callbacks = callbacks
@@ -100,35 +111,40 @@ class HorizonTrainer(Trainer):
         for self.hstep in range(horizon):
 
             self._horizon_step()
+            #self._horizon_step_end()
 
+    def _horizon_step(self):
+        raise NotImplementedError()
 
-    def _episode_end(self):
-
-        # TODO implement these callbacks a bit better
+    def _async_step(self, **kwargs):
+        self.l.acquire()
+        self.async_steps+=1
         for callback in self.callbacks:
-            if hasattr(callback, "episode_step"):
-                callback.episode_step(episode=self.episode, step=self.estep, episode_reward=self.acc_reward)
+            callback.step(**kwargs)
+        self.l.release()
+
+    def _async_episode_step(self, **kwargs):
+        self.le.acquire()
+        acc_reward = kwargs['acc_reward']
+        self.mvavg_reward.append(acc_reward)
+        self.async_episode_steps+=1
+        if self.verbose and self.async_episode_steps%self.num_threads == 0:
+            prRed("#Training time: {:.2f} minutes".format(time.clock() / 60))
+            prGreen(
+                "#Horizon step {}/{} Mvavg reward: {:.2f}" \
+                    .format(self.hstep, self.horizon, np.mean(self.mvavg_reward)))
+        self.le.release()
+
+
+    def _horizon_step_end(self, **kwargs):
+        for callback in self.callbacks:
+            callback.step(episode=self.episode, step=self.hstep, reward=self.acc_reward, **kwargs)
 
         if self.verbose:
             prRed("#Training time: {:.2f} minutes".format(time.clock() / 60))
             prGreen(
-                "#Horizon step {}/{} Episode {} Mvavg reward: {:.2f}" \
+                "#Horizon step {}/{} Episode {} Mvavg reward: {:.2f}"\
                     .format(self.hstep, self.horizon, self.episode, np.mean(self.mvavg_reward)))
-
-    def _episode_step(self, s, a, r, d):
-        if self.render:
-            self.env.render()
-        self.acc_reward += r
-        self.mvavg_reward.append(self.acc_reward)
-        if d:
-            self.acc_reward = 0
-            self._episode_end()
-            self.estep = 0
-            self.acc_reward = 0
-            self.episode+=1
-
-    def _horizon_step(self):
-        pass
 
 
 def reward_transform(env, obs, r, done, **kwargs):

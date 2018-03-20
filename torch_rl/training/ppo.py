@@ -230,8 +230,7 @@ class DPPOTrainer(HorizonTrainer):
 
 
 
-    @staticmethod
-    def gather_experience_and_calc_advantages(network, q, reward_q, max_episode_len, gamma, lmda, env, step, pid, T, sigma_log):
+    def gather_experience_and_calc_advantages(self, network, q, reward_q, max_episode_len, gamma, lmda, env, step, pid, T, sigma_log):
         np.random.seed(pid)
         tor.manual_seed(pid)
         env.seed(pid)
@@ -258,6 +257,9 @@ class DPPOTrainer(HorizonTrainer):
                 state, reward, done, _ = env.step(np.clip(env_action, -1, 1))
                 # reward /= 100.
                 # print(reward)
+
+                self._async_step(state=state, reward=reward)
+
                 episode_length += 1
                 acc_reward += reward
                 done = done or episode_length >= max_episode_len
@@ -276,6 +278,7 @@ class DPPOTrainer(HorizonTrainer):
                     state = env.reset()
                     episode_length = 0
                     reward_q.put(acc_reward)
+                    self._async_episode_step(acc_reward=acc_reward)
                     #print("Acc reward in episode: ", acc_reward)
                     acc_reward = 0
                     break
@@ -305,7 +308,7 @@ class DPPOTrainer(HorizonTrainer):
 
         for i in range(self.num_threads):
             process = mltip.Process(target=DPPOTrainer.gather_experience_and_calc_advantages,
-                                    args=(self.network, experience_queue, reward_queue, self.max_episode_len,
+                                    args=(self,self.network, experience_queue, reward_queue, self.max_episode_len,
                                           self.gamma, self.lmda, copy.deepcopy(self.env),
                                           self._episode_step, np.random.randint(0,10000), self.T, self.sigma_log))
             processes.append(process)
@@ -315,8 +318,6 @@ class DPPOTrainer(HorizonTrainer):
         experience_queue.empty()
         for process in processes:
             process.terminate()
-
-
 
         reward_arr = queue_to_array(reward_queue)
 
@@ -411,4 +412,4 @@ class DPPOTrainer(HorizonTrainer):
 # network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
 # trainer = DPPOTrainer(network=network, network_old=network_old, env=env)
 # trainer.train(horizon=100000, max_episode_len=500)
-#
+
