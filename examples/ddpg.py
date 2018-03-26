@@ -9,6 +9,7 @@ from torch_rl.utils.stats import TrainingStatsCallback
 from torch_rl.utils import cuda_if_available, gauss_init
 from torch_rl.utils.callbacks import CheckpointCallback
 from torch_rl.utils import timestamp
+import os
 
 import torch as tor
 
@@ -52,7 +53,7 @@ critic = cuda_if_available(
 actor.apply(gauss_init(0, weight_init_sigma))
 critic.apply(gauss_init(0, weight_init_sigma))
 
-data_root = "/Users/Jimmy/Data/ddpg_" + timestamp()
+data_root =  os.path.join(os.environ["TRL_DATA_PATH"], "ddpg_" + timestamp())
 
 # Training
 trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
