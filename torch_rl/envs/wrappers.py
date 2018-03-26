@@ -103,8 +103,8 @@ class ShapedRewardGoalEnv(GoalEnvWrapper):
             self.normalising_factor = 2.
 
     def _reward(self, reward):
-        if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
-            return -np.sum(np.abs(self._goal - self._s[self.indices])/self.normalising_factor/len(self.indices))
+        if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor[self.indices]) > self.precision):
+            return -np.sum(np.abs(self._goal - self._s[self.indices])/self.normalising_factor[self.indices]/len(self.indices))
         else:
             return 1
 
