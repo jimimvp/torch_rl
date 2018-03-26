@@ -6,7 +6,7 @@ from torch_rl.envs import NormalisedActionsWrapper, NormalisedObservationsWrappe
 from torch_rl.memory import SequentialMemory, SpikingHindsightMemory,  HindsightMemory
 from torch_rl.training import DDPGTrainer, SpikingDDPGTrainer
 from torch_rl.envs import SparseRewardGoalEnv
-from torch_rl.stats import RLTrainingStats
+from torch_rl.utils.stats  import TrainingStatsCallback
 from torch_rl.models import Reservoir
 from torch_rl.utils import ParameterGrid
 import datetime
@@ -17,7 +17,7 @@ import os
 
 """
 
-ROOT_DIR = "/disk/no_backup/vlasteli/Projects/torch_rl/examples/training_stats/grid_training"
+ROOT_DIR = os.path.join(os.environ['TRL_DATA_PATH'], "training_data")
 EPISODES = 3000
 
 
@@ -90,7 +90,7 @@ def grid_training(p):
     output_dir = "{}/ddpg".format(ROOT_DIR) + suff + "_" + str(
         datetime.datetime.now()).replace(" ", "_")
 
-    stats = RLTrainingStats(save_destination=output_dir)
+    stats = TrainingStatsCallback(save_destination=output_dir)
     p.to_json(os.path.join(output_dir, "parameters.json"))
 
     trainer.train(EPISODES, max_episode_len=p.max_episode_length, verbose=True, callbacks=[stats])
