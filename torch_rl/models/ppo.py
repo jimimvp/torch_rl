@@ -5,6 +5,7 @@ from torch.distributions import Normal, Uniform
 import numpy as np
 from torch_rl.utils import to_tensor
 import torch as tor
+from torch import nn
 
 class PPONetwork(StochasticContinuousNeuralNet):
 
@@ -57,11 +58,10 @@ class PPONetwork(StochasticContinuousNeuralNet):
         return self.dist.log_prob(values)
 
 
-class RandSigmaPPONetwork(StochasticContinuousNeuralNet):
+class PPONetwork(StochasticContinuousNeuralNet):
 
-    sigma_log_bounds = [-0.7, -1.6]
 
-    def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),activation_functions=None):
+    def __init__(self, architecture, weight_init=gauss_weights_init(0,0.2),activation_functions=None):
         super(RandSigmaPPONetwork, self).__init__()
         if len(architecture) < 2:
             raise Exception("Architecture needs at least two numbers to create network")
@@ -74,6 +74,9 @@ class RandSigmaPPONetwork(StochasticContinuousNeuralNet):
             setattr(self, "fc" + str(i), self.layer_list[-1])
 
         self.apply(weight_init)
+        self.siglog = nn.Parameter(self.siglog)
+
+
 
     def forward(self, x):
         if self.activation_functions:
@@ -87,8 +90,7 @@ class RandSigmaPPONetwork(StochasticContinuousNeuralNet):
 
         self.means = self.tanh(x[:,:int((x.shape[1]-1))])
         # Choose sigmas randomly
-        self.sigmas = to_tensor(np.full((x.shape[0], x.shape[1]-1),np.e ** self.sigma_log))
-        self.dist = Normal(self.means, self.sigmas)
+        self.dist = Normal(self.means, self.siglog)
         self.value = x[:,-1]
         self.sampled = self.dist.rsample()
         x = self.sampled
@@ -120,8 +122,6 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
 
 
 
-    sigma_log_bounds = [-0.7, -1.6]
-
     def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),activation_functions=None):
         super(ActorCriticPPO, self).__init__()
         if len(architecture) < 2:
@@ -130,8 +130,9 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
         self.activation_functions = activation_functions
         self.layer_list = []
         self.layer_list_val = []
+        self.siglog = tor.zeros(1, requires_grad=True)
 
-        self.sigma_log = self.sigma_log_bounds[0]
+        self.siglog = nn.Parameter(self.siglog)
 
         for i in range(len(architecture)-1):
             self.layer_list.append(nn.Linear(architecture[i], architecture[i+1]))
@@ -141,9 +142,10 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
             self.layer_list_val.append(nn.Linear(architecture[i], architecture[i + 1]))
             setattr(self, "fc_val" + str(i), self.layer_list_val[-1])
 
-        self.last_value_layer = nn.Linear(architecture[-1], 1)
+        #self.last_value_layer = nn.Linear(architecture[-1], 1)
 
         self.apply(weight_init)
+
 
     def policy_forward(self, x):
 
@@ -154,12 +156,12 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
                 x = func(self.layer_list[i](x))
         else:
             for i, layer in enumerate(self.layer_list[:-1]):
-                x = self.relu(layer(x))
+                x = self.tanh(layer(x))
 
         x = self.layer_list[-1](x)
 
         self.means = self.tanh(x)
-        self.sigmas = to_tensor(np.full((x.shape[0], x.shape[1]), np.e ** self.sigma_log))
+        self.sigmas = tor.exp(tor.zeros(x.shape) + self.siglog)
         self.dist = Normal(self.means, self.sigmas)
 
         self.sampled = self.dist.rsample()
@@ -176,9 +178,8 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
                 x = func(self.layer_list_val[i](x))
         else:
             for i, layer in enumerate(self.layer_list_val):
-                x = self.relu(layer(x))
+                x = self.tanh(layer(x))
 
-        x = self.last_value_layer(x)
         return x
 
     def forward(self, x):
@@ -190,10 +191,9 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
         return tor.cat([action, value], dim=1)
 
 
-    def __call__(self, state, sigma_log):
-        self.sigma_log = sigma_log
+    def __call__(self, state):
+        #self.sigma_log -= sigma_epsilon
         action, value = self.policy_forward(state), self.value_forward(state)
-        self.sigma_log = max(self.sigma_log, self.sigma_log_bounds[0])
 
         return action, value
 
@@ -205,8 +205,11 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
     def mu(self):
         return self.means
 
-    def log_prob(self, values):
+    def logprob(self, values):
         return self.dist.log_prob(values)
+
+    def entropy(self):
+        return self.dist.entropy()
 
 
 
