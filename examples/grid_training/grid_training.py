@@ -17,7 +17,12 @@ import os
 
 """
 
+
+
+assert "TRL_DATA_PATH" in os.environ, "Set TRL_DATA_PATH variable to the path where you want to store the training statistics."
+
 ROOT_DIR = os.path.join(os.environ['TRL_DATA_PATH'], "training_data")
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 EPISODES = 3000
 
 
@@ -97,11 +102,13 @@ def grid_training(p):
 
 
 parser = argparse.ArgumentParser(description='Process some integers.')
-parser.add_argument('--config', "-c", default="grid.json",
+parser.add_argument('--config', "-c", default=os.path.join(SCRIPT_DIR, "grid.json"),
                     help='JSON file that specifies the parameter grid that is to be used for training')
-parser.add_argument('--config-spiking', "-cs", default="grid_spiking.json",
+parser.add_argument('--config-spiking', "-cs", default=os.path.join(SCRIPT_DIR, "grid_spiking.json"),
                     help='JSON file that specifies the parameter grid that is to be'
                          ' used for training of the reservoir version.')
+parser.add_argument('--did', "-id", default=0,
+                    help='ID of GPU to be used for training', type=int)
 
 args = parser.parse_args()
 
@@ -117,14 +124,17 @@ def seed(s):
     tor.manual_seed(s)
     random.seed(s)
 
-for i, parameters in enumerate(grid_spiking):
-    seed(666)
-    print("####", "GRID TRAINING RESERVOIR {}/{}.".format(i, len(grid)), "####")
-    grid_training(parameters)
 
+c1 = 0; c2 = 0;
 
+with tor.cuda.device(args.did):
 
-for i, parameters in enumerate(grid):
-    seed(666)
-    print("####", "GRID TRAINING {}/{}.".format(i, len(grid)), "####")
-    grid_training(parameters)
+    for i, parameters in enumerate(grid_spiking):
+        seed(666)
+        print("####", "GRID TRAINING RESERVOIR {}/{}.".format(i, len(grid)), "####")
+        grid_training(parameters)
+
+        if i < len(grid):
+            seed(666)
+            print("####", "GRID TRAINING {}/{}.".format(i, len(grid)), "####")
+            grid_training(grid[i])
