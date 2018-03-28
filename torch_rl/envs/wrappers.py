@@ -1,6 +1,9 @@
 import gym
 import numpy as np
-from .utils import wrapped_by
+from torch_rl.envs.utils import wrapped_by
+from torch_rl.utils import RunningMeanStd
+
+
 
 class NormalisedActionsWrapper(gym.ActionWrapper):
 
@@ -26,19 +29,30 @@ class NormalisedObservationsWrapper(gym.ObservationWrapper):
         return observation
 
 
-class GoalEnvWrapper(gym.RewardWrapper):
+
+from torch_rl.envs.utils import potential_goal_indices
+
+class GoalEnvWrapper(gym.RewardWrapper, NormalisedActionsWrapper):
     """
     Wrapper to create a goal based environment.
     """
-    def __init__(self,*args,**kwargs):
+    def __init__(self, *args, **kwargs):
         if "indices" in kwargs:
             self.indices = kwargs.get("indices")
             del kwargs['indices']
         else:
             self.indices = None
+
+        if "separate" in kwargs:
+            self.separate = kwargs["separate"]
+        else:
+            #By default separate the goal from the state
+            self.separate  = True
+
+
         super(GoalEnvWrapper, self).__init__(*args, **kwargs)
         if self.indices is None:
-            self.indices = np.arange(0, self.observation_space.shape[0])
+            self.indices = potential_goal_indices(self)
 
     def reset(self, **kwargs):
         self._s = super(GoalEnvWrapper, self).reset(**kwargs)
@@ -47,7 +61,13 @@ class GoalEnvWrapper(gym.RewardWrapper):
 
     def _step(self, action):
         info = super(GoalEnvWrapper, self)._step(action)
-        self._s = info[0]
+        if self.separate:
+            self._s = info[0][not self.indices]
+            self._goal = info[0][self.indices]
+        else:
+            self._s = info[0]
+        info[0] = self._s
+
         return info
 
     def _reward(self, reward):
@@ -111,6 +131,42 @@ class ShapedRewardGoalEnv(GoalEnvWrapper):
 
 
 
+class BaselinesNormalize(gym.ObservationWrapper):
+    """
+        Normalization wrapper by running mean and standard deviation, as done in the OpenAI baselines
+        implementation. This wrapper is made only for one environment, not a vector
+        of environments as in the baselines implementation.
+    """
+    def __init__(self, env, ob=True, ret=True, clipob=10., cliprew=10., gamma=0.99, epsilon=1e-8):
+        super(BaselinesNormalize, self).__init__(env)
+        self.env = env
+        self.ob_rms = RunningMeanStd(shape=()) if ob else None
+        self.ret_rms = RunningMeanStd(shape=()) if ret else None
+        self.clipob = clipob
+        self.cliprew = cliprew
+        self.ret = np.zeros(1)
+        self.gamma = gamma
+        self.epsilon = epsilon
+
+    def _step(self, action):
+        obs, rews, news, infos = self.env.step()
+        self.ret = self.ret * self.gamma + rews
+        obs = self._obfilt(obs)
+        if self.ret_rms:
+            self.ret_rms.update(self.ret)
+            rews = np.clip(rews / np.sqrt(self.ret_rms.std**2 + self.epsilon), -self.cliprew, self.cliprew)
+        return obs, rews, news, infos
+
+    def _observation(self, obs):
+        if self.ob_rms:
+            self.ob_rms.update(obs)
+            obs = np.clip((obs - self.ob_rms.mean) / (self.ob_rms.std + self.epsilon), -self.clipob, self.clipob)
+            return obs
+        else:
+            return obs
+
+
+
 class OsimArmWrapper(gym.ObservationWrapper):
     """
     Wrapper that wraps the Stanford OpenSim environment to make it gym standard.
@@ -120,3 +176,19 @@ class OsimArmWrapper(gym.ObservationWrapper):
 
     def _observation(self, observation):
         return observation[2:]
+
+
+
+
+# import gym
+# env = BaselinesNormalize(gym.make("MountainCar-v0"))
+# env.reset()
+# for i in range(10):
+#     obs, _,_,_ = env.step(env.action_space.sample())
+#     print(obs)
+
+
+
+
+
+
