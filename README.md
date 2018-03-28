@@ -6,7 +6,8 @@ Reinforcement learning algorithms for spiking networks and artificial neural net
 
 1. Deep deterministic policy gradients with hindsight experience replay
 2. Stochastic policy gradient with hindsight experience replay
-3. Hindsight policy gradient with a biased policy gradient estimator
+3. Biased hindsight policy gradient
+4. Proximal Policy Optimization on GPU
 
 ## In progress...
 

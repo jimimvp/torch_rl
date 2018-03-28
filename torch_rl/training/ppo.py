@@ -48,7 +48,7 @@ class AdvantageEstimator(object):
 
         for _ in range(self.nsteps):
             actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
-            neglogpacs = self.network.logprob(actions)
+            neglogpacs = -self.network.logprob(actions)
 
             mb_obs.append(self.obs.copy().reshape(-1))
             mb_actions.append(actions.data.numpy().reshape(-1))
@@ -184,7 +184,7 @@ class GPUPPO(HorizonTrainer):
                     OLDVPRED = tt(bvalues)
 
                     self.network(BATCH)
-                    neglogpac = self.network.logprob(A)
+                    neglogpac = -self.network.logprob(A)
                     entropy = tor.mean(self.network.entropy())
 
                     #### Value function loss ####
@@ -196,14 +196,16 @@ class GPUPPO(HorizonTrainer):
 
                     v_loss = .5 * tor.mean(tor.max(v_loss1, v_loss2))
 
-                    ### Ratio calculation #### d
-                    ratio = tor.exp(OLDNEGLOGPAC - neglogpac)
+                    ### Ratio calculation ####
+                    # Note: it is flipped because we are dealing with -log(p), not log(p) as
+                    # in the baselines implementation
+                    ratio = tor.exp(-neglogpac + OLDNEGLOGPAC)
 
                     ### Policy gradient calculation ###
                     pg_loss1 = -ADV * ratio
                     pg_loss2 = -ADV * tor.clamp(ratio, 1. - self.epsilon, 1. + self.epsilon)
                     pg_loss = tor.mean(tor.max(pg_loss1, pg_loss2))
-                    approxkl = .5 * tor.mean((neglogpac - OLDNEGLOGPAC)**2)
+                    approxkl = .5 * tor.mean((-neglogpac + OLDNEGLOGPAC)**2)
 
 
                     loss = v_loss  + pg_loss
@@ -214,26 +216,30 @@ class GPUPPO(HorizonTrainer):
                     loss.backward()
                     self.optimizer.step()
 
-        print(np.mean(self.advantage_estimator.mvavg_rewards))
+
         #Push to CPU
         self.network.cpu()
+        print("mvavg_reward: ", np.mean(self.advantage_estimator.mvavg_rewards))
+        print("siglog: ", np.mean(self.network.siglog.data.numpy()))
 
 
-# from torch_rl.envs.wrappers import *
-# import gym
-# from torch_rl.models.ppo import ActorCriticPPO
-# import sys
-
-# env = BaselinesNormalize(
-#     NormalisedActionsWrapper(gym.make("Pendulum-v0")))
-# print(env.observation_space.shape)
 
 
-# with tor.cuda.device(1):
-#     network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-#     network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-#     print(network)
+from torch_rl.envs.wrappers import *
+import gym
+from torch_rl.models.ppo import ActorCriticPPO
+import sys
 
-#     trainer = GPUPPO(network=network, network_old=network_old, env=env)
-#     trainer.train(horizon=100000, max_episode_len=500)
+env = BaselinesNormalize(
+    NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+print(env.observation_space.shape)
+
+
+with tor.cuda.device(1):
+    network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+    network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+    print(network)
+
+    trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
+    trainer.train(horizon=100000, max_episode_len=500)
 

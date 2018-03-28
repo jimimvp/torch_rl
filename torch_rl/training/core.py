@@ -111,7 +111,7 @@ class HorizonTrainer(Trainer):
         for self.hstep in range(horizon):
 
             self._horizon_step()
-            #self._horizon_step_end()
+            self._horizon_step_end()
 
     def _horizon_step(self):
         raise NotImplementedError()
