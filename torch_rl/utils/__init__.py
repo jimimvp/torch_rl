@@ -1,2 +1,2 @@
 from .utils import *
-from .running_mean_std import *
+from .mpi_running_mean_std import *

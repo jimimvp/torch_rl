@@ -35,7 +35,6 @@ class RunningMeanStd(object):
         self._count += totalvec[2*n]
 
         self._mean = self._sum / self._count
-        print(self._sumsq)
         self._std = tor.sqrt(tor.max(self._sumsq / self._count - self._mean**2 , tor.zeros_like(self._sumsq) + 1e-2))
        
 
