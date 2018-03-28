@@ -9,6 +9,7 @@ from torch_rl.utils.stats import TrainingStatsCallback
 from torch_rl.utils import cuda_if_available, gauss_init
 from torch_rl.utils.callbacks import CheckpointCallback
 from torch_rl.utils import timestamp
+from torch_rl.envs.wrappers import BaselinesNormalize
 import os
 
 import torch as tor
@@ -25,22 +26,22 @@ num_episodes = 2000
 batch_size = 64
 tau = 0.001
 epsilon = 1.0
-depsilon = 1. / 50000
+depsilon = 1. / 3000
 gamma = 0.99
 replay_capacity = 1000000
 warmup = 2000
 max_episode_length = 500
 actor_learning_rate = 1e-4
 critic_learning_rate = 1e-3
-middle_layer_size = [400, 300]
+middle_layer_size = [64, 64]
 weight_init_sigma = 0.003
 
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
-env = SparseRewardGoalEnv(NormalisedActionsWrapper(gym.make("Pendulum-v0")), precision=1e-1)
+env = NormalisedActionsWrapper(gym.make("Pendulum-v0"))
 env.reset()
 num_actions = env.action_space.shape[0]
-num_observations = env.observation_space.shape[0]*2
+num_observations = env.observation_space.shape[0]
 relu, tanh = tor.nn.ReLU(), tor.nn.Tanh()
 
 actor = cuda_if_available(SimpleNetwork([num_observations, middle_layer_size[0], middle_layer_size[1], num_actions],
