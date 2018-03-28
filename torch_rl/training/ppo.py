@@ -1,7 +1,7 @@
 from torch_rl.training.core import HorizonTrainer, mse_loss
 from torch_rl.memory import GeneralisedlMemory
 from torch.optim import Adam
-from torch_rl.utils import to_tensor
+from torch_rl.utils import to_tensor as tt
 import torch as tor
 from collections import deque
 from torch_rl.utils import prGreen
@@ -35,17 +35,19 @@ class AdvantageEstimator(object):
         self.gamma = gamma
         self.lam = lam
         self.nsteps = nsteps
-        self.states = None
-        self.dones = [False for _ in range(nenv)]
+        self.state = None
+        self.done = False
         self.acc_reward = 0
         self.global_step = 0
 
     def run(self):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [], [], [], [], [], []
-        mb_states = self.states
+        mb_state = self.state
         epinfos = []
+        acc_reward = 0
+
         for _ in range(self.nsteps):
-            actions, values = self.network(to_tensor(self.obs).view(1,-1))
+            actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
             neglogpacs = self.network.logprob(actions)
 
             mb_obs.append(self.obs.copy().reshape(-1))
@@ -53,16 +55,13 @@ class AdvantageEstimator(object):
             mb_values.append(values.detach().data.numpy().reshape(-1))
             mb_neglogpacs.append(neglogpacs.data.numpy().reshape(-1))
 
-            mb_dones.append(self.dones)
+            mb_dones.append(self.done)
 
-            obs, rewards, self.dones, infos = self.env.step(actions.data.numpy())
-            self.dones = self.dones[0]
-            obs = obs[0]
-            rewards = rewards[0]
+            obs, reward, self.done, infos = self.env.step(actions.data.numpy())
             self.obs = obs
-            self.acc_reward += rewards
+            acc_reward += reward
             self.global_step += 1
-            mb_rewards.append(rewards)
+            mb_rewards.append(reward)
 
             for info in infos:
                 maybeepinfo = info.get('episode')
@@ -71,9 +70,11 @@ class AdvantageEstimator(object):
                     self.mvavg_rewards.append(maybeepinfo['r'])
                     epinfos.append(maybeepinfo)
 
-            if self.dones or self.global_step % 500 == 0:
-                self.acc_reward = 0
+            if self.done or self.global_step % 500 == 0:
+                self.mvavg_rewards.append(acc_reward)
+                acc_reward = 0
                 self.obs = self.env.reset()
+
 
 
         # batch of steps to batch of rollouts
@@ -84,7 +85,7 @@ class AdvantageEstimator(object):
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32).reshape(self.nsteps, -1)
         mb_dones = np.asarray(mb_dones, dtype=np.bool).reshape(self.nsteps, -1)
 
-        action, last_values = self.network(to_tensor(self.obs.reshape(1,-1)))
+        action, last_values = self.network(tt(self.obs.reshape(1,-1), cuda=False))
         action, last_values = action.data.numpy().reshape(-1), last_values.data.numpy().reshape(-1)
 
         # discount/bootstrap off value fn
@@ -93,7 +94,7 @@ class AdvantageEstimator(object):
         lastgaelam = 0
         for t in reversed(range(self.nsteps)):
             if t == self.nsteps - 1:
-                nextnonterminal = 1.0 - self.dones
+                nextnonterminal = 1.0 - self.done
                 nextvalues = last_values
             else:
                 nextnonterminal = 1.0 - mb_dones[t + 1]
@@ -110,7 +111,7 @@ class AdvantageEstimator(object):
             return arr
 
         return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs)),
-                mb_states, epinfos)
+                mb_state, epinfos)
 
         # obs, returns, masks, actions, values, neglogpacs, states = runner.run()
 
@@ -161,7 +162,9 @@ class GPUPPO(HorizonTrainer):
         self.epinfobuf.extend(epinfos)
         nbatch_train = self.n_steps // self.n_minibatches
 
+
         self.optimizer = Adam(self.network.parameters(), self.lr)
+        self.network.cuda()
         if states is None: # nonrecurrent version
             inds = np.arange(self.n_steps)
             for _ in range(self.n_update_steps):
@@ -173,23 +176,25 @@ class GPUPPO(HorizonTrainer):
                     advs = breturns - bvalues
                     advs = (advs - advs.mean()) / (advs.std() + 1e-8)
 
-                    A = to_tensor(bactions)
-                    ADV = to_tensor(advs)
-                    R = to_tensor(breturns)
-                    OLDNEGLOGPAC = to_tensor(bneglogpacs)
-                    OLDVPRED = to_tensor(bvalues)
+                    BATCH = tt(bobs)
+                    A = tt(bactions)
+                    ADV = tt(advs)
+                    R = tt(breturns)
+                    OLDNEGLOGPAC = tt(bneglogpacs)
+                    OLDVPRED = tt(bvalues)
 
+                    self.network(BATCH)
                     neglogpac = self.network.logprob(A)
                     entropy = tor.mean(self.network.entropy())
 
                     #### Value function loss ####
                     #print(bobs)
-                    actions_new, v_pred = self.network(to_tensor(bobs))
+                    actions_new, v_pred = self.network(tt(bobs))
                     v_pred_clipped = tor.clamp(v_pred - OLDVPRED, -self.epsilon, self.epsilon)
                     v_loss1 = (v_pred- R)**2
                     v_loss2 = (v_pred_clipped - R)**2
 
-                    v_loss = .5 * tor.mean(tor.max(tor.cat((v_loss1, v_loss2), dim=1), dim=1)[0])
+                    v_loss = .5 * tor.mean(tor.max(v_loss1, v_loss2))
 
                     ### Ratio calculation #### d
                     ratio = tor.exp(OLDNEGLOGPAC - neglogpac)
@@ -197,7 +202,7 @@ class GPUPPO(HorizonTrainer):
                     ### Policy gradient calculation ###
                     pg_loss1 = -ADV * ratio
                     pg_loss2 = -ADV * tor.clamp(ratio, 1. - self.epsilon, 1. + self.epsilon)
-                    pg_loss = tor.mean(tor.max(tor.cat((pg_loss1, pg_loss2), dim=1), dim=1)[0])
+                    pg_loss = tor.mean(tor.max(pg_loss1, pg_loss2))
                     approxkl = .5 * tor.mean((neglogpac - OLDNEGLOGPAC)**2)
 
 
@@ -209,162 +214,26 @@ class GPUPPO(HorizonTrainer):
                     loss.backward()
                     self.optimizer.step()
 
-    def __init__(self, env, network, network_old, num_episodes=2000, max_episode_len=500, batch_size=64, gamma=.99,
-                 replay_memory=GeneralisedlMemory(12000, window_length=1), lr=1e-3, memory_fill_steps=2048,
-                 epsilon=0.2, optimizer=None, lmda=0.95, ent_coeff=0., policy_update_epochs=10, num_threads=5):
-        super(DPPOTrainer, self).__init__(env)
-        self.lr = lr
-        self.batch_size = batch_size
-        self.replay_memory = replay_memory
-        self.max_episode_len = max_episode_len
-        self.epsilon = epsilon
-        self.gamma = gamma
-        self.lmda = lmda
-        self.optimizer = Adam(network.parameters(), lr=lr) if optimizer is None else optimizer
-        self.goal_based = hasattr(env, "goal")
-        self.memory_fill_steps = memory_fill_steps
-        self.network = network
-        self.network_old = network_old
-        self.policy_update_epochs = policy_update_epochs
-        self.ent_coeff = ent_coeff
-        self.num_episodes = 0
-        self.num_threads = num_threads
-        self.sigma_log = -0.7
-        self.T = 30
-        self.reward_std = deque(maxlen=100)
-
-        # Convenience buffers for faster iteration over advantage calculation
-    def add_to_replay_memory(self,s,a,r,d):
-        if self.goal_based:
-            self.replay_memory.append(self.state, self.env.goal, a, r, d, training=True)
-        else:
-            self.replay_memory.append(self.state, a, r, d, training=True)
+        print(np.mean(self.advantage_estimator.mvavg_rewards))
+        #Push to CPU
+        self.network.cpu()
 
 
-
-
-    def gather_experience_and_calc_advantages(self, network, q, reward_q, max_episode_len, gamma, lmda, env, step, pid, T, sigma_log):
-        np.random.seed(pid)
-        tor.manual_seed(pid)
-        env.seed(pid)
-        state = env.reset()
-        episode_length = 0
-        acc_reward = 0
-        adv_states = np.zeros((T, env.observation_space.shape[0]))
-        adv_actions = np.zeros((T, env.action_space.shape[0]))
-        adv_rewards = np.zeros(T)
-        adv_values = np.zeros(T)
-        adv_returns = np.zeros(T)
-        adv_advantages = np.zeros(T)
-        while True:
-
-            counter = 0
-            for i in range(T):
-                counter += 1
-                adv_states[i] = state
-                action, value = network(to_tensor(state).view(1,-1), sigma_log)
-                adv_actions[i] = action.data.numpy()
-                adv_values[i] = value.data.numpy()
-
-                env_action = action.data.squeeze().numpy()
-                state, reward, done, _ = env.step(np.clip(env_action, -1, 1))
-                # reward /= 100.
-                # print(reward)
-
-                self._async_step(state=state, reward=reward)
-
-                episode_length += 1
-                acc_reward += reward
-                done = done or episode_length >= max_episode_len
-
-                # step(state, env_action, reward, done)
-
-                #reward = max(min(reward, 1), -1)
-                adv_rewards[i] = reward
-
-                R = np.zeros((1,1))
-                if not done:
-                    R = value.data.numpy()
-                adv_values[i] = R
-
-                if done:
-                    state = env.reset()
-                    episode_length = 0
-                    reward_q.put(acc_reward)
-                    self._async_episode_step(acc_reward=acc_reward)
-                    #print("Acc reward in episode: ", acc_reward)
-                    acc_reward = 0
-                    break
-
-
-            if done:
-                continue
-
-            A = np.zeros((1, 1))
-            for j in reversed(range(counter-1)):
-                td = adv_rewards[j] + gamma * adv_values[j + 1] - adv_values[j]
-                A = td + gamma * lmda * A
-                adv_advantages[j] = A
-                R = A + adv_values[j]
-                adv_returns[j] = R
-                q.put([adv_states[j], adv_actions[j], adv_rewards[j],
-                                          False, [adv_returns[j], adv_advantages[j]]])
-
-
-    def multithreaded_explore(self):
-
-        self.network.share_memory()
-        processes = []
-        experience_queue = Queue()
-        reward_queue = Queue()
-        import copy
-
-        for i in range(self.num_threads):
-            process = mltip.Process(target=DPPOTrainer.gather_experience_and_calc_advantages,
-                                    args=(self,self.network, experience_queue, reward_queue, self.max_episode_len,
-                                          self.gamma, self.lmda, copy.deepcopy(self.env),
-                                          self._episode_step, np.random.randint(0,10000), self.T, self.sigma_log))
-            processes.append(process)
-            process.start()
-        for i in tqdm(range(self.memory_fill_steps)):
-            self.replay_memory.append(*experience_queue.get(block=True))
-        experience_queue.empty()
-        for process in processes:
-            process.terminate()
-
-        reward_arr = queue_to_array(reward_queue)
-
-        self.mvavg_reward.append(reward_arr.mean())
-        self.reward_std.append(reward_arr.std())
-
-        prGreen("#Horizon step: {} Average reward: {} "
-                "Reward step average std: {}".format(self.hstep, np.mean(self.mvavg_reward), np.mean(self.reward_std)))
-
-
-    def sample_and_update(self):
-        av_loss = 0
-        # update old model
-        self.network_old.load_state_dict(self.network.state_dict())
-
-
-        self.multithreaded_explore()
-        self.sample_and_update()
-        self.sigma_log -= 1e-2
-
-
-#
-#
 # from torch_rl.envs.wrappers import *
 # import gym
 # from torch_rl.models.ppo import ActorCriticPPO
-#
-# env = NormalisedObservationsWrapper(
+# import sys
+
+# env = BaselinesNormalize(
 #     NormalisedActionsWrapper(gym.make("Pendulum-v0")))
-# print(env.reward_range)
-#
-#
-# network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-# network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-# trainer = DPPOTrainer(network=network, network_old=network_old, env=env)
-# trainer.train(horizon=100000, max_episode_len=500)
+# print(env.observation_space.shape)
+
+
+# with tor.cuda.device(1):
+#     network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+#     network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+#     print(network)
+
+#     trainer = GPUPPO(network=network, network_old=network_old, env=env)
+#     trainer.train(horizon=100000, max_episode_len=500)
 
