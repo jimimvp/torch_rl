@@ -3,59 +3,9 @@ from torch_rl.utils import gauss_weights_init
 from torch import nn
 from torch.distributions import Normal, Uniform
 import numpy as np
-from torch_rl.utils import to_tensor
+from torch_rl.utils import to_tensor, cuda_if_available
 import torch as tor
 from torch import nn
-
-class PPONetwork(StochasticContinuousNeuralNet):
-
-    def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),activation_functions=None):
-        super(PPONetwork, self).__init__()
-        if len(architecture) < 2:
-            raise Exception("Architecture needs at least two numbers to create network")
-        assert architecture[-1]%2 == 1, "Last layer has to represent 2*actions_space for the Gaussian + 1 for value"
-        self.activation_functions = activation_functions
-        self.layer_list = []
-        for i in range(len(architecture)-1):
-            self.layer_list.append(nn.Linear(architecture[i], architecture[i+1]))
-            setattr(self, "fc" + str(i), self.layer_list[-1])
-
-        self.apply(weight_init)
-
-    def forward(self, x):
-        if self.activation_functions:
-            for i, func in enumerate(self.activation_functions):
-                x = func(self.layer_list[i](x))
-        else:
-            for i, layer in enumerate(self.layer_list[:-1]):
-                x = self.relu(layer(x))
-
-        x = self.layer_list[-1](x)
-
-        self.means = self.tanh(x[:,:int((x.shape[1]-1)/2)])
-        self.sigmas = np.e ** self.tanh(x[:, int((x.shape[1]-1)/2):-1])
-        self.dist = Normal(self.means, self.sigmas)
-        self.value = x[:,-1]
-        self.sampled = self.dist.rsample()
-        x = self.sampled
-        self.out = x
-        return x
-
-
-    def __call__(self, state):
-        action = self.forward(state)
-        return action, self.value
-
-
-    def sigma(self):
-
-        return self.sigmas
-
-    def mu(self):
-        return self.means
-
-    def log_prob(self, values):
-        return self.dist.log_prob(values)
 
 
 class PPONetwork(StochasticContinuousNeuralNet):
@@ -117,9 +67,8 @@ class PPONetwork(StochasticContinuousNeuralNet):
         return self.dist.log_prob(values)
 
 
-
+#Abbr.
 class ActorCriticPPO(StochasticContinuousNeuralNet):
-
 
 
     def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),activation_functions=None):
@@ -131,6 +80,7 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
         self.layer_list = []
         self.layer_list_val = []
         self.siglog = tor.zeros(1, requires_grad=True)
+
 
         self.siglog = nn.Parameter(self.siglog)
 
@@ -161,8 +111,7 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
         x = self.layer_list[-1](x)
 
         self.means = self.tanh(x)
-        self.sigmas = tor.exp(tor.zeros(x.shape) + self.siglog)
-        self.dist = Normal(self.means, self.sigmas)
+        self.dist = Normal(self.means, tor.exp(self.siglog))
 
         self.sampled = self.dist.rsample()
         x = self.sampled
