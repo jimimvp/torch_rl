@@ -41,19 +41,19 @@ class AdvantageEstimator(object):
         self.global_step = 0
 
     def run(self):
-        mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [], [], [], [], [], []
+        mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_logpacs = [], [], [], [], [], []
         mb_state = self.state
         epinfos = []
         acc_reward = 0
 
         for _ in range(self.nsteps):
             actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
-            neglogpacs = -self.network.logprob(actions)
+            logpacs = -self.network.logprob(actions)
 
             mb_obs.append(self.obs.copy().reshape(-1))
             mb_actions.append(actions.data.numpy().reshape(-1))
             mb_values.append(values.detach().data.numpy().reshape(-1))
-            mb_neglogpacs.append(neglogpacs.data.numpy().reshape(-1))
+            mb_logpacs.append(logpacs.data.numpy().reshape(-1))
 
             mb_dones.append(self.done)
 
@@ -82,7 +82,7 @@ class AdvantageEstimator(object):
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32).reshape(self.nsteps, -1)
         mb_actions = np.asarray(mb_actions, dtype=np.float32).reshape(self.nsteps, -1)
         mb_values = np.asarray(mb_values, dtype=np.float32).reshape(self.nsteps, -1)
-        mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32).reshape(self.nsteps, -1)
+        mb_logpacs = np.asarray(mb_logpacs, dtype=np.float32).reshape(self.nsteps, -1)
         mb_dones = np.asarray(mb_dones, dtype=np.bool).reshape(self.nsteps, -1)
 
         action, last_values = self.network(tt(self.obs.reshape(1,-1), cuda=False))
@@ -110,7 +110,7 @@ class AdvantageEstimator(object):
             s = arr.shape
             return arr
 
-        return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs)),
+        return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_logpacs)),
                 mb_state, epinfos)
 
         # obs, returns, masks, actions, values, neglogpacs, states = runner.run()
@@ -158,7 +158,7 @@ class GPUPPO(HorizonTrainer):
     def _horizon_step(self):
 
 
-        obs, returns, masks, actions, values, neglogpacs, states, epinfos = self.advantage_estimator.run() #pylint: disable=E0632
+        obs, returns, masks, actions, values, logpacs, states, epinfos = self.advantage_estimator.run() #pylint: disable=E0632
         self.epinfobuf.extend(epinfos)
         nbatch_train = self.n_steps // self.n_minibatches
 
@@ -172,7 +172,7 @@ class GPUPPO(HorizonTrainer):
                 for start in range(0, self.n_steps, nbatch_train):
                     end = start + nbatch_train
                     mbinds = inds[start:end]
-                    bobs, breturns, bmasks, bactions, bvalues, bneglogpacs = map(lambda arr: arr[mbinds], (obs, returns, masks, actions, values, neglogpacs))
+                    bobs, breturns, bmasks, bactions, bvalues, blogpacs = map(lambda arr: arr[mbinds], (obs, returns, masks, actions, values, logpacs))
                     advs = breturns - bvalues
                     advs = (advs - advs.mean()) / (advs.std() + 1e-8)
 
@@ -180,11 +180,11 @@ class GPUPPO(HorizonTrainer):
                     A = tt(bactions)
                     ADV = tt(advs)
                     R = tt(breturns)
-                    OLDNEGLOGPAC = tt(bneglogpacs)
+                    OLDLOGPAC = tt(blogpacs)
                     OLDVPRED = tt(bvalues)
 
                     self.network(BATCH)
-                    neglogpac = -self.network.logprob(A)
+                    logpac = self.network.logprob(A)
                     entropy = tor.mean(self.network.entropy())
 
                     #### Value function loss ####
@@ -197,15 +197,14 @@ class GPUPPO(HorizonTrainer):
                     v_loss = .5 * tor.mean(tor.max(v_loss1, v_loss2))
 
                     ### Ratio calculation ####
-                    # Note: it is flipped because we are dealing with -log(p), not log(p) as
-                    # in the baselines implementation
-                    ratio = tor.exp(-neglogpac + OLDNEGLOGPAC)
+                    # In the baselines implementation these are negative logits, then it is flipped
+                    ratio = tor.exp(logpac - OLDLOGPAC)
 
                     ### Policy gradient calculation ###
                     pg_loss1 = -ADV * ratio
                     pg_loss2 = -ADV * tor.clamp(ratio, 1. - self.epsilon, 1. + self.epsilon)
                     pg_loss = tor.mean(tor.max(pg_loss1, pg_loss2))
-                    approxkl = .5 * tor.mean((-neglogpac + OLDNEGLOGPAC)**2)
+                    approxkl = .5 * tor.mean((logpac - OLDLOGPAC)**2)
 
 
                     loss = v_loss  + pg_loss
@@ -225,21 +224,21 @@ class GPUPPO(HorizonTrainer):
 
 
 
-from torch_rl.envs.wrappers import *
-import gym
-from torch_rl.models.ppo import ActorCriticPPO
-import sys
+# from torch_rl.envs.wrappers import *
+# import gym
+# from torch_rl.models.ppo import ActorCriticPPO
+# import sys
 
-env = BaselinesNormalize(
-    NormalisedActionsWrapper(gym.make("Pendulum-v0")))
-print(env.observation_space.shape)
+# env = BaselinesNormalize(
+#     NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+# print(env.observation_space.shape)
 
 
-with tor.cuda.device(1):
-    network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-    network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-    print(network)
+# with tor.cuda.device(1):
+#     network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+#     network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+#     print(network)
 
-    trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
-    trainer.train(horizon=100000, max_episode_len=500)
+#     trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
+#     trainer.train(horizon=100000, max_episode_len=500)
 
