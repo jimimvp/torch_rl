@@ -190,8 +190,8 @@ class GPUPPO(HorizonTrainer):
                     #### Value function loss ####
                     #print(bobs)
                     actions_new, v_pred = self.network(tt(bobs))
-                    v_pred_clipped = tor.clamp(v_pred - OLDVPRED, -self.epsilon, self.epsilon)
-                    v_loss1 = (v_pred- R)**2
+                    v_pred_clipped = OLDVPRED + tor.clamp(v_pred - OLDVPRED, -self.epsilon, self.epsilon)
+                    v_loss1 = (v_pred - R)**2
                     v_loss2 = (v_pred_clipped - R)**2
 
                     v_loss = .5 * tor.mean(tor.max(v_loss1, v_loss2))
@@ -220,25 +220,27 @@ class GPUPPO(HorizonTrainer):
         self.network.cpu()
         print("mvavg_reward: ", np.mean(self.advantage_estimator.mvavg_rewards))
         print("siglog: ", np.mean(self.network.siglog.data.numpy()))
+        print("pgloss: ", pg_loss.cpu().data.numpy())
+        print("vfloss: ", v_loss.cpu().data.numpy())
 
 
 
 
-# from torch_rl.envs.wrappers import *
-# import gym
-# from torch_rl.models.ppo import ActorCriticPPO
-# import sys
+from torch_rl.envs.wrappers import *
+import gym
+from torch_rl.models.ppo import ActorCriticPPO
+from torch_rl.utils import *
+import sys
 
-# env = BaselinesNormalize(
-#     NormalisedActionsWrapper(gym.make("Pendulum-v0")))
-# print(env.observation_space.shape)
+env = BaselinesNormalize(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+print(env.observation_space.shape)
 
 
-# with tor.cuda.device(1):
-#     network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-#     network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-#     print(network)
+with tor.cuda.device(1):
+    network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+    network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+    network.apply(gauss_init(0, np.sqrt(2)))
 
-#     trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
-#     trainer.train(horizon=100000, max_episode_len=500)
+    trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
+    trainer.train(horizon=100000, max_episode_len=500)
 
