@@ -126,8 +126,10 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
             for i, func in enumerate(self.activation_functions):
                 x = func(self.layer_list_val[i](x))
         else:
-            for i, layer in enumerate(self.layer_list_val):
+            for i, layer in enumerate(self.layer_list_val[:-1]):
                 x = self.tanh(layer(x))
+
+        x = self.layer_list_val[-1](x)
 
         return x
 
