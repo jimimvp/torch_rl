@@ -10,6 +10,7 @@ from torch_rl.utils import cuda_if_available, gauss_init
 from torch_rl.utils.callbacks import CheckpointCallback
 from torch_rl.utils import timestamp
 from torch_rl.envs.wrappers import BaselinesNormalize
+from torch_rl.envs import EnvLogger
 import os
 
 import torch as tor
@@ -38,7 +39,7 @@ weight_init_sigma = 0.003
 
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
-env = NormalisedActionsWrapper(gym.make("Pendulum-v0"))
+env = EnvLogger(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
 env.reset()
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]

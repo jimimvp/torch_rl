@@ -23,9 +23,7 @@ class Trainer(object):
     def __init__(self, env):
         self.env = env
         self.state = self.env.reset()
-        self.mvavg_reward = deque(maxlen=100)
         self.callbacks = []
-        self.acc_reward = 0
 
         self.estep = 0
         self.episode = 0
@@ -34,37 +32,36 @@ class Trainer(object):
         self.render = False
 
     def train(self, num_episodes, max_episode_len, render=False, verbose=True, callbacks=[]):
-        mvavg_reward = deque(maxlen=100)
         self._warmup()
         self.verbose = True
         for episode in range(num_episodes):
             self.state = self.env.reset()
             t_episode_start = time.time()
-            acc_reward = 0
             self._episode_start()
-
+            acc_reward = 0
             for step in range(max_episode_len):
-                s, r, d, i = self._episode_step(episode, acc_reward)
+                s, r, d, i = self._episode_step(episode)
+                acc_reward += r
                 for callback in callbacks:
                     callback.step(episode=episode, step=step, reward=r, **i)
                 if render:
                     self.env.render()
                 if d:
                     break
-                acc_reward += r
 
             #TODO implement these callbacks a bit better
             for callback in callbacks:
                 if hasattr(callback, "episode_step"):
                     callback.episode_step(episode=episode, step=step, episode_reward=acc_reward)
+            acc_reward = 0
             self._episode_end(episode)
 
-            mvavg_reward.append(acc_reward)
             episode_time = time.time() - t_episode_start
-            if verbose:
-                prRed("#Training time: {:.2f} minutes".format(time.clock() / 60))
-                prGreen("#Episode {}. Mvavg reward: {:.2f} Episode reward: {:.2f} Episode steps: {} Episode time: {:.2f} min"\
-                        .format(episode, np.mean(mvavg_reward), acc_reward, step + 1, episode_time / 60))
+            logger.logkv("training_time", "{:.2f} minutes".format(time.clock() / 60))
+            logger.logkv("episode", episode)
+            logger.logkv("episode_time", episode_time / 60)
+            logger.logkv("episode_steps", step+1)
+            logger.dumpkvs()
 
     def _episode_step(self):
         raise NotImplementedError()

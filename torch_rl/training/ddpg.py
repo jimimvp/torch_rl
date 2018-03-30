@@ -63,7 +63,7 @@ class DDPGTrainer(Trainer):
 
         self.random_process.reset()
 
-    def _episode_step(self, episode, acc_reward):
+    def _episode_step(self, episode):
         if self.goal_based:
             action = self.agent.action(np.hstack((self.state, self.env.goal))).cpu().data.numpy()
         else:
