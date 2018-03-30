@@ -34,8 +34,7 @@ def level_check(func):
             assert level in levels, "Unknown logging level"
         return func(*args, **kwargs)
     return dec 
-
-
+ 
 class KVWriter(object):
     def writekvs(self, kvs):
         raise NotImplementedError
@@ -258,7 +257,7 @@ def warn(*args):
 def error(*args):
     log(*args, level=ERROR)
 
-
+@level_check
 def set_level(level):
     """
     Set logging threshold on current logger.
