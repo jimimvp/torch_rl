@@ -205,26 +205,26 @@ def make_output_format(format, ev_dir, log_suffix=''):
 # API
 # ================================================================
 
-def logkv(key, val):
+def logkv(key, val, level=INFO):
     """
     Log a value of some diagnostic
     Call this once for each diagnostic quantity, each iteration
     If called many times, last value will be used.
     """
-    Logger.CURRENT.logkv(key, val)
+    Logger.CURRENT.logkv(key, val, level)
 
-def logkv_mean(key, val):
+def logkv_mean(key, val, level=INFO):
     """
     The same as logkv(), but if called many times, values averaged.
     """
-    Logger.CURRENT.logkv_mean(key, val)
+    Logger.CURRENT.logkv_mean(key, val, level)
 
-def logkvs(d):
+def logkvs(d, level=INFO):
     """
     Log a dictionary of key-value pairs
     """
     for (k, v) in d.items():
-        logkv(k, v)
+        logkv(k, v, level)
 
 def dumpkvs():
     """
@@ -320,9 +320,12 @@ class Logger(object):
     # Logging API, forwarded
     # ----------------------------------------
     def logkv(self, key, val, level=INFO):
-        self.name2val[key] = val
+        if self.level <= level:
+            self.name2val[key] = val
 
     def logkv_mean(self, key, val, level=INFO):
+        if self.level > level:
+            return
         if val is None:
             self.name2val[key] = None
             return
