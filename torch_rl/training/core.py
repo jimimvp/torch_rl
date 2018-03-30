@@ -100,7 +100,6 @@ class HorizonTrainer(Trainer):
     def train(self, horizon, max_episode_len, render=False, verbose=True, callbacks=[]):
         self.callbacks = callbacks
         self.estep = 0
-        self.episode = 0
 
         self._warmup()
         self.verbose = True
@@ -133,7 +132,6 @@ class HorizonTrainer(Trainer):
     def _horizon_step_end(self, **kwargs):
 
         logger.logkv('horizon_step', self.hstep)
-        logger.logkv('episodes', self.episode)
         for callback in self.callbacks:
             callback.step(episode=self.episode, step=self.hstep, reward=self.acc_reward, **kwargs)
 
