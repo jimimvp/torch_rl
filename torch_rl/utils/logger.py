@@ -1,5 +1,6 @@
 """
     Taken from https://raw.githubusercontent.com/openai/baselines/master/baselines/logger.py
+    Slightly modified.
 """
 
 
@@ -22,7 +23,7 @@ INFO = 20
 WARN = 30
 ERROR = 40
 
-DISABLED = 50
+DISABLED = 5
 
 class KVWriter(object):
     def writekvs(self, kvs):
@@ -354,15 +355,15 @@ Logger.DEFAULT = Logger.CURRENT = Logger(dir=None, output_formats=[HumanOutputFo
 
 def configure(dir=None, format_strs=None):
     if dir is None:
-        dir = os.getenv('OPENAI_LOGDIR')
+        dir = os.getenv('TRL_LOG_DIR')
     if dir is None:
         dir = osp.join(tempfile.gettempdir(),
-            datetime.datetime.now().strftime("openai-%Y-%m-%d-%H-%M-%S-%f"))
+            datetime.datetime.now().strftime("torch-rl-%Y-%m-%d-%H-%M-%S-%f"))
     assert isinstance(dir, str)
     os.makedirs(dir, exist_ok=True)
 
     if format_strs is None:
-        strs = os.getenv('OPENAI_LOG_FORMAT')
+        strs = os.getenv('TRL_LOG_FORMAT')
         format_strs = strs.split(',') if strs else LOG_OUTPUT_FORMATS
     output_formats = [make_output_format(f, dir) for f in format_strs]
 
