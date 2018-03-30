@@ -1,5 +1,6 @@
 import torch as tor
 from torch_rl.utils import *
+from torch_rl.utils import logger
 from collections import deque
 import time
 
@@ -13,6 +14,7 @@ def random_process_action_choice(random_process):
 
 def mse_loss(input, target):
     return tor.mean(tor.sum((input - target) ** 2))
+
 
 
 class Trainer(object):
@@ -125,28 +127,20 @@ class HorizonTrainer(Trainer):
 
     def _async_episode_step(self, **kwargs):
         self.le.acquire()
-        acc_reward = kwargs['acc_reward']
         self.mvavg_reward.append(acc_reward)
         self.async_episode_steps+=1
-        if self.verbose and self.async_episode_steps%self.num_threads == 0:
-            prRed("#Training time: {:.2f} minutes".format(time.clock() / 60))
-            prGreen(
-                "#Horizon step {}/{} Mvavg reward: {:.2f}" \
-                    .format(self.hstep, self.horizon, np.mean(self.mvavg_reward)))
+        
         self.le.release()
 
 
     def _horizon_step_end(self, **kwargs):
+
+        logger.logkv('horizon_step', self.hstep)
+        logger.logkv('episodes', self.episode)
         for callback in self.callbacks:
             callback.step(episode=self.episode, step=self.hstep, reward=self.acc_reward, **kwargs)
 
-        if self.verbose:
-            prRed("#Training time: {:.2f} minutes".format(time.clock() / 60))
-            prGreen(
-                "#Horizon step {}/{} Episode {} Mvavg reward: {:.2f}"\
-                    .format(self.hstep, self.horizon, self.episode, np.mean(self.mvavg_reward)))
-
-
+        
 def reward_transform(env, obs, r, done, **kwargs):
     goal = kwargs.get('goal', None)
     if not goal is None:
