@@ -7,6 +7,7 @@ from collections import deque
 from torch_rl.utils import prGreen
 import time
 import sys
+from torch_rl.utils import logger
 
 def queue_to_array(q):
     q.put(False)
@@ -70,7 +71,7 @@ class AdvantageEstimator(object):
                     self.mvavg_rewards.append(maybeepinfo['r'])
                     epinfos.append(maybeepinfo)
 
-            if self.done or self.global_step % 500 == 0:
+            if self.done:
                 self.mvavg_rewards.append(acc_reward)
                 acc_reward = 0
                 self.obs = self.env.reset()
@@ -218,29 +219,40 @@ class GPUPPO(HorizonTrainer):
 
         #Push to CPU
         self.network.cpu()
-        print("mvavg_reward: ", np.mean(self.advantage_estimator.mvavg_rewards))
-        print("siglog: ", np.mean(self.network.siglog.data.numpy()))
-        print("pgloss: ", pg_loss.cpu().data.numpy())
-        print("vfloss: ", v_loss.cpu().data.numpy())
+        logger.logkv("mvavg_reward", np.mean(self.advantage_estimator.mvavg_rewards))
+        logger.logkv("siglog", np.mean(self.network.siglog.data.numpy()))
+        logger.logkv("pgloss", pg_loss.cpu().data.numpy())
+        logger.logkv("vfloss", v_loss.cpu().data.numpy())
+        logger.dumpkvs()
 
 
 
+if __name__ == '__main__':
 
-# from torch_rl.envs.wrappers import *
-# import gym
-# from torch_rl.models.ppo import ActorCriticPPO
-# from torch_rl.utils import *
-# import sys
+    from torch_rl.envs.wrappers import *
+    import gym
+    from gym.wrappers import Monitor
+    from torch_rl.models.ppo import ActorCriticPPO
+    from torch_rl.utils import *
+    from torch_rl.utils import logger
+    import sys
 
-# env = BaselinesNormalize(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
-# print(env.observation_space.shape)
+
+    monitor = Monitor(NormalisedActionsWrapper(gym.make("Pendulum-v0")), directory="./stats", force=True, 
+        video_callable=False, write_upon_reset=True)
+    env = BaselinesNormalize(monitor)
+    logger.configure()
+    print(env.observation_space.shape)
 
 
-# with tor.cuda.device(1):
-#     network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-#     network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-#     network.apply(gauss_init(0, np.sqrt(2)))
+    with tor.cuda.device(1):
+        network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+        network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+        network.apply(gauss_init(0, np.sqrt(2)))
 
-#     trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
-#     trainer.train(horizon=100000, max_episode_len=500)
+        trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
+        trainer.train(horizon=100000, max_episode_len=500)
+
+
+
 
