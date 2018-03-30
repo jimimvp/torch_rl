@@ -219,7 +219,6 @@ class GPUPPO(HorizonTrainer):
 
         #Push to CPU
         self.network.cpu()
-        logger.logkv("mvavg_reward", np.mean(self.advantage_estimator.mvavg_rewards))
         logger.logkv("siglog", np.mean(self.network.siglog.data.numpy()))
         logger.logkv("pgloss", pg_loss.cpu().data.numpy())
         logger.logkv("vfloss", v_loss.cpu().data.numpy())
@@ -235,10 +234,11 @@ if __name__ == '__main__':
     from torch_rl.models.ppo import ActorCriticPPO
     from torch_rl.utils import *
     from torch_rl.utils import logger
+    from torch_rl.envs import EnvLogger
     import sys
 
-
-    monitor = Monitor(NormalisedActionsWrapper(gym.make("Pendulum-v0")), directory="./stats", force=True, 
+    logger.configure()
+    monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make("Pendulum-v0"))), directory="./stats", force=True, 
         video_callable=False, write_upon_reset=True)
     env = BaselinesNormalize(monitor)
     logger.configure()
