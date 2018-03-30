@@ -226,21 +226,21 @@ class GPUPPO(HorizonTrainer):
 
 
 
-from torch_rl.envs.wrappers import *
-import gym
-from torch_rl.models.ppo import ActorCriticPPO
-from torch_rl.utils import *
-import sys
+# from torch_rl.envs.wrappers import *
+# import gym
+# from torch_rl.models.ppo import ActorCriticPPO
+# from torch_rl.utils import *
+# import sys
 
-env = BaselinesNormalize(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
-print(env.observation_space.shape)
+# env = BaselinesNormalize(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+# print(env.observation_space.shape)
 
 
-with tor.cuda.device(1):
-    network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-    network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-    network.apply(gauss_init(0, np.sqrt(2)))
+# with tor.cuda.device(1):
+#     network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+#     network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
+#     network.apply(gauss_init(0, np.sqrt(2)))
 
-    trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
-    trainer.train(horizon=100000, max_episode_len=500)
+#     trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
+#     trainer.train(horizon=100000, max_episode_len=500)
 
