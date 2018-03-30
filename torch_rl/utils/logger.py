@@ -319,10 +319,10 @@ class Logger(object):
 
     # Logging API, forwarded
     # ----------------------------------------
-    def logkv(self, key, val):
+    def logkv(self, key, val, level=INFO):
         self.name2val[key] = val
 
-    def logkv_mean(self, key, val):
+    def logkv_mean(self, key, val, level=INFO):
         if val is None:
             self.name2val[key] = None
             return
