@@ -25,6 +25,17 @@ ERROR = 40
 
 DISABLED = 5
 
+levels = [DEBUG, INFO, WARN, ERROR, DISABLED]
+
+def level_check(func):
+    def dec(*args, **kwargs):
+        if 'level' in kwargs:
+            level = kwargs['level']
+            assert level in levels, "Unknown logging level"
+        return func(*args, **kwargs)
+    return dec 
+
+
 class KVWriter(object):
     def writekvs(self, kvs):
         raise NotImplementedError
@@ -419,6 +430,14 @@ def _demo():
     dumpkvs()
 
 
+
+def _factory_demo():
+    factory = LoggerFactory()
+    logger1 = factory.create_logger()
+    logger1.logkv("a",  6)
+
+    factory.dump()
+
 # ================================================================
 # Readers
 # ================================================================
@@ -469,5 +488,46 @@ def read_tb(path):
             data[step-1, colidx] = value
     return pandas.DataFrame(data, columns=tags)
 
+
+class LoggerFactory(object):
+    """
+        A class that creates loggers and keeps track of them,
+        this is for convenience when we have many loggers on
+        different levels tracking differt things at the same time.
+    """
+    def __init__(self):
+        super(LoggerFactory, self).__init__()
+
+        self.loggers = []
+
+    @level_check
+    def create_logger(self, dir=None, output_formats=[HumanOutputFormat(sys.stdout)], level=INFO):
+        """
+            Creates a logger and observes it.
+        """
+        logger = Logger(dir, output_formats)
+        logger.set_level(level)
+                
+        self.loggers.append(logger)
+
+        return logger
+
+    def dump(self):
+        for logger in self.loggers:
+            logger.dumpkvs()
+
+    def close(self):
+        """
+            Closes alls loggers
+        """
+        for logger in self.loggers:
+            logger.close() 
+
+
+
+
+
+
 if __name__ == "__main__":
     _demo()
+    _factory_demo()
