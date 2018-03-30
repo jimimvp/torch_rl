@@ -235,8 +235,23 @@ def dumpkvs():
     """
     Logger.CURRENT.dumpkvs()
 
+
+def printkvs():
+    """
+    Write all of the diagnostics from the current iteration, but don't clear
+
+    level: int. (see logger.py docs) If the global logger level is higher than
+                the level argument here, don't print to stdout.
+    """
+    Logger.CURRENT.printkvs()
+
+
 def getkvs():
     return Logger.CURRENT.name2val
+
+
+def __get__(key):
+    return Logger.CURRENT.name2val[key]
 
 
 def log(*args, level=INFO):
@@ -310,12 +325,13 @@ class Logger(object):
                     # So that you can still log to the terminal without setting up any output files
     CURRENT = None  # Current logger being used by the free functions above
 
-    def __init__(self, dir, output_formats):
+    def __init__(self, dir, output_formats, clear=True):
         self.name2val = defaultdict(float)  # values this iteration
         self.name2cnt = defaultdict(int)
         self.level = INFO
         self.dir = dir
         self.output_formats = output_formats
+        self.clear_dicts = clear
 
     # Logging API, forwarded
     # ----------------------------------------
@@ -334,12 +350,33 @@ class Logger(object):
         self.name2cnt[key] = cnt + 1
 
     def dumpkvs(self):
+        """
+            Prints to output and clears the buffer.
+        """
+        self.printkvs()
+        if self.clear_dicts:
+            self.clear()
+
+    def printkvs(self):
+        """
+            Just prints to output, doesn't clear.
+        """
         if self.level == DISABLED: return
         for fmt in self.output_formats:
             if isinstance(fmt, KVWriter):
                 fmt.writekvs(self.name2val)
+
+    def clear(self):
         self.name2val.clear()
         self.name2cnt.clear()
+
+    def dec(key, num=1):
+        self.name2val.get(key, 0)
+        self.name2val[key] = val - num
+
+    def inc(key, num=1):
+        val = self.name2val.get(key, 0)
+        self.name2val[key] = val + num
 
     def log(self, *args, level=INFO):
         if self.level <= level:
@@ -366,7 +403,7 @@ class Logger(object):
 
 Logger.DEFAULT = Logger.CURRENT = Logger(dir=None, output_formats=[HumanOutputFormat(sys.stdout)])
 
-def configure(dir=None, format_strs=None):
+def configure(dir=None, format_strs=None, clear=True):
     if dir is None:
         dir = os.getenv('TRL_LOG_DIR')
     if dir is None:
@@ -380,7 +417,7 @@ def configure(dir=None, format_strs=None):
         format_strs = strs.split(',') if strs else LOG_OUTPUT_FORMATS
     output_formats = [make_output_format(f, dir) for f in format_strs]
 
-    Logger.CURRENT = Logger(dir=dir, output_formats=output_formats)
+    Logger.CURRENT = Logger(dir=dir, output_formats=output_formats, clear=clear)
     log('Logging to %s'%dir)
 
 def reset():

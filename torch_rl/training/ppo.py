@@ -8,6 +8,7 @@ from torch_rl.utils import prGreen
 import time
 import sys
 from torch_rl.utils import logger
+import numpy as np
 
 def queue_to_array(q):
     q.put(False)
@@ -26,8 +27,6 @@ def queue_to_array(q):
 
 class AdvantageEstimator(object):
 
-    mvavg_rewards = deque(maxlen=100)
-
     def __init__(self, env, network, nsteps, gamma, lam):
         self.env = env
         self.network = network
@@ -38,14 +37,13 @@ class AdvantageEstimator(object):
         self.nsteps = nsteps
         self.state = None
         self.done = False
-        self.acc_reward = 0
         self.global_step = 0
+        self.episodes = 0
 
     def run(self):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_logpacs = [], [], [], [], [], []
         mb_state = self.state
         epinfos = []
-        acc_reward = 0
 
         for _ in range(self.nsteps):
             actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
@@ -60,20 +58,12 @@ class AdvantageEstimator(object):
 
             obs, reward, self.done, infos = self.env.step(actions.data.numpy())
             self.obs = obs
-            acc_reward += reward
             self.global_step += 1
             mb_rewards.append(reward)
 
-            for info in infos:
-                maybeepinfo = info.get('episode')
-                if maybeepinfo:
-                    print(maybeepinfo)
-                    self.mvavg_rewards.append(maybeepinfo['r'])
-                    epinfos.append(maybeepinfo)
-
             if self.done:
-                self.mvavg_rewards.append(acc_reward)
-                acc_reward = 0
+                self.episodes+=1
+                logger.logkv("episodes", self.episodes)
                 self.obs = self.env.reset()
 
 
@@ -112,7 +102,7 @@ class AdvantageEstimator(object):
             return arr
 
         return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_logpacs)),
-                mb_state, epinfos)
+                mb_state)
 
         # obs, returns, masks, actions, values, neglogpacs, states = runner.run()
 
@@ -123,15 +113,15 @@ class AdvantageEstimator(object):
         return f
 
 
-class GPUPPO(HorizonTrainer):
+class GPUPPOTrainer(HorizonTrainer):
 
     mvavg_reward = deque(maxlen=100)
 
 
-    def __init__(self, env, network, network_old, max_episode_len=500, gamma=.99,
+    def __init__(self, env, network, max_episode_len=500, gamma=.99,
                  replay_memory=GeneralisedlMemory(12000, window_length=1), lr=3e-4, n_steps=40,
                  epsilon=0.2, optimizer=None, lmda=0.95, ent_coeff=0., n_update_steps=10, num_threads=5, n_minibatches=1):
-        super(GPUPPO, self).__init__(env)
+        super(GPUPPOTrainer, self).__init__(env)
 
         self.n_minibatches = n_minibatches
         self.lr = lr
@@ -143,13 +133,8 @@ class GPUPPO(HorizonTrainer):
         self.optimizer = Adam(network.parameters(), lr=lr) if optimizer is None else optimizer
         self.goal_based = hasattr(env, "goal")
         self.network = network
-        self.network_old = network_old
         self.ent_coeff = ent_coeff
-        self.num_episodes = 0
         self.num_threads = num_threads
-        self.sigma_log = -0.7
-        self.T = 30
-        self.epinfobuf = deque(maxlen=100)
         self.n_update_steps = n_update_steps
         self.n_steps = n_steps
         self.advantage_estimator = AdvantageEstimator(env, self.network, n_steps, self.gamma, self.lmda)
@@ -159,12 +144,9 @@ class GPUPPO(HorizonTrainer):
     def _horizon_step(self):
 
 
-        obs, returns, masks, actions, values, logpacs, states, epinfos = self.advantage_estimator.run() #pylint: disable=E0632
-        self.epinfobuf.extend(epinfos)
+        obs, returns, masks, actions, values, logpacs, states = self.advantage_estimator.run() #pylint: disable=E0632
         nbatch_train = self.n_steps // self.n_minibatches
 
-
-        self.optimizer = Adam(self.network.parameters(), self.lr)
         self.network.cuda()
         if states is None: # nonrecurrent version
             inds = np.arange(self.n_steps)
@@ -177,14 +159,14 @@ class GPUPPO(HorizonTrainer):
                     advs = breturns - bvalues
                     advs = (advs - advs.mean()) / (advs.std() + 1e-8)
 
-                    BATCH = tt(bobs)
+                    OBS = tt(bobs)
                     A = tt(bactions)
                     ADV = tt(advs)
                     R = tt(breturns)
                     OLDLOGPAC = tt(blogpacs)
                     OLDVPRED = tt(bvalues)
 
-                    self.network(BATCH)
+                    self.network(OBS)
                     logpac = self.network.logprob(A)
                     entropy = tor.mean(self.network.entropy())
 
@@ -222,6 +204,7 @@ class GPUPPO(HorizonTrainer):
         logger.logkv("siglog", np.mean(self.network.siglog.data.numpy()))
         logger.logkv("pgloss", pg_loss.cpu().data.numpy())
         logger.logkv("vfloss", v_loss.cpu().data.numpy())
+        logger.logkv("approxkl", approxkl.cpu().data.numpy())
         logger.dumpkvs()
 
 
@@ -237,20 +220,18 @@ if __name__ == '__main__':
     from torch_rl.envs import EnvLogger
     import sys
 
-    logger.configure()
+    logger.configure(clear=False)
     monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make("Pendulum-v0"))), directory="./stats", force=True, 
         video_callable=False, write_upon_reset=True)
     env = BaselinesNormalize(monitor)
-    logger.configure()
     print(env.observation_space.shape)
 
 
     with tor.cuda.device(1):
         network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-        network_old = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
         network.apply(gauss_init(0, np.sqrt(2)))
 
-        trainer = GPUPPO(network=network, network_old=network_old, env=env, n_update_steps=4, n_steps=40)
+        trainer = GPUPPO(network=network, env=env, n_update_steps=4, n_steps=40)
         trainer.train(horizon=100000, max_episode_len=500)
 
 
