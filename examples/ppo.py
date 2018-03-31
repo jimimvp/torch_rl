@@ -11,18 +11,24 @@ from torch_rl.models.ppo import ActorCriticPPO
 from torch_rl.training.ppo import GPUPPOTrainer
 from torch_rl.utils import *
 
-# Use for logging in training
-from torch_rl.utils import logger
-
 # Use for logging of moving average episode rewards to console
 from torch_rl.envs import EnvLogger
-import sys
+from torch_rl import config
 
-logger.configure(clear=False)
-monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make("Pendulum-v0"))), directory="./stats", force=True, 
+
+import sys
+import os
+
+
+config.set_root('torch_rl_ppo_example', force=True)
+config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout'])
+
+monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make('Pendulum-v0'))), 
+    directory=os.path.join(config.root_path(), 'stats'), force=True, 
     video_callable=False, write_upon_reset=True)
 env = BaselinesNormalize(monitor)
 print(env.observation_space.shape)
+
 
 
 with tor.cuda.device(1):
