@@ -157,6 +157,10 @@ def configure_logging(clear=False, output_formats=['stdout'], force=False, root_
     logger.configure(clear=clear, output_formats=output_formats)
 
 
+def start_tensorboard():
+    from subprocess import Popen
+    p = Popen(['tensorboard', '--logdir', tensorboard_path()])
+
 
 
 
