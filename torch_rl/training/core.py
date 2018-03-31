@@ -57,7 +57,7 @@ class Trainer(object):
             self._episode_end(episode)
 
             episode_time = time.time() - t_episode_start
-            logger.logkv("training_time", "{:.2f} minutes".format(time.clock() / 60))
+            logger.logkv("training_time", "{:.2f}".format(time.clock() / 60))
             logger.logkv("episode", episode)
             logger.logkv("episode_time", episode_time / 60)
             logger.logkv("episode_steps", step+1)

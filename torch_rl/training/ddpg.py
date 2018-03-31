@@ -5,6 +5,7 @@ from torch_rl.utils import *
 from torch_rl.core import ActorCriticAgent
 from torch_rl.memory import SequentialMemory
 import copy
+from torch_rl.utils import logger
 
 """
     Implementation of deep deterministic policy gradients with soft updates.
@@ -97,8 +98,8 @@ class DDPGTrainer(Trainer):
         q_predicted = self.agent.values(to_tensor(s1), to_tensor(a1), requires_grad=True)
 
         self.optimizer_critic.zero_grad()
-        critic_loss = DDPGTrainer.critic_criterion(q_expected, q_predicted)
-        critic_loss.backward(retain_graph=True)
+        loss_critic = DDPGTrainer.critic_criterion(q_expected, q_predicted)
+        loss_critic.backward()
         self.optimizer_critic.step()
         # Actor optimization
 
@@ -108,8 +109,12 @@ class DDPGTrainer(Trainer):
         loss_actor = -q.mean()
 
         self.optimizer_actor.zero_grad()
-        loss_actor.backward(retain_graph=True)
+        loss_actor.backward()
         self.optimizer_actor.step()
+
+        logger.logkv('loss_actor', loss_actor.cpu().data.numpy())
+        logger.logkv('loss_critic', loss_critic.cpu().data.numpy())
+
 
         soft_update(self.target_agent.policy_network, self.agent.policy_network, self.tau)
         soft_update(self.target_agent.critic_network, self.agent.critic_network, self.tau)

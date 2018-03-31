@@ -139,8 +139,6 @@ class GPUPPOTrainer(HorizonTrainer):
         self.n_steps = n_steps
         self.advantage_estimator = AdvantageEstimator(env, self.network, n_steps, self.gamma, self.lmda)
 
-        print(self.network)
-
     def _horizon_step(self):
 
 
@@ -148,6 +146,8 @@ class GPUPPOTrainer(HorizonTrainer):
         nbatch_train = self.n_steps // self.n_minibatches
 
         self.network.cuda()
+        self.optimizer = Adam(self.network.parameters(), lr=self.lr) 
+
         if states is None: # nonrecurrent version
             inds = np.arange(self.n_steps)
             for _ in range(self.n_update_steps):

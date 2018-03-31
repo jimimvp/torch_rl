@@ -11,6 +11,8 @@ from torch_rl.utils.callbacks import CheckpointCallback
 from torch_rl.utils import timestamp
 from torch_rl.envs.wrappers import BaselinesNormalize
 from torch_rl.envs import EnvLogger
+
+from torch_rl import config
 import os
 
 import torch as tor
@@ -39,7 +41,10 @@ weight_init_sigma = 0.003
 
 replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
-env = EnvLogger(NormalisedActionsWrapper(gym.make("Pendulum-v0")))
+config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout'], root_dir='ddpg_' + timestamp(), force=True)
+
+
+env = EnvLogger(NormalisedActionsWrapper(gym.make('Pendulum-v0')))
 env.reset()
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]
@@ -55,7 +60,6 @@ critic = cuda_if_available(
 actor.apply(gauss_init(0, weight_init_sigma))
 critic.apply(gauss_init(0, weight_init_sigma))
 
-data_root =  os.path.join(os.environ["TRL_DATA_PATH"], "ddpg_" + timestamp())
 
 # Training
 trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
@@ -63,9 +67,8 @@ trainer = DDPGTrainer(env=env, actor=actor, critic=critic,
                       lr_actor=actor_learning_rate, lr_critic=critic_learning_rate, warmup=warmup, replay_memory=replay_memory
                       )
 
-stats = TrainingStatsCallback(save_destination=data_root)
-checkpoint_callback = CheckpointCallback(save_path=data_root, models={"actor": actor, "critic" : critic})
+checkpoint_callback = CheckpointCallback(save_path=config.root_path(), models={"actor": actor, "critic" : critic})
 
 
 
-trainer.train(2000, max_episode_len=500, verbose=True, callbacks=[stats, checkpoint_callback])
+trainer.train(2000, max_episode_len=500, verbose=True, callbacks=[checkpoint_callback])
