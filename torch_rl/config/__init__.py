@@ -3,6 +3,7 @@ import json
 from collections import namedtuple
 import torch_rl
 from torch_rl.utils import timestamp
+import shutil
 
 module_path = os.path.abspath(os.path.dirname(torch_rl.__file__))
 default_config_path = os.path.join(module_path, 'default.config')
@@ -76,6 +77,16 @@ def benchmark_path():
 def video_path():
     return Config.CURRENT.paths['video']
 
+def root_path():
+    return Config.CURRENT.target_path  
+
+@check_main_path_defined
+def data_path():
+    """
+        Top level directory for storing torch_rl data.
+    """
+    return os.environ['TRL_DATA_PATH']
+
 
 
 class Config(object):
@@ -124,8 +135,31 @@ def set_root(root, force=False):
 
     Config.CURRENT.target_path = root if os.path.isabs(root) else os.path.join(os.environ['TRL_DATA_PATH'], root)
     if force:
+        if os.path.isdir(Config.CURRENT.target_path):
+            shutil.rmtree(Config.CURRENT.target_path)
         os.makedirs(Config.CURRENT.target_path)
 
 Config.CURRENT = Config(**default_config)
 set_root('training_data_' + timestamp())
+
+
+@check_main_path_defined
+def configure_logging(clear=False, output_formats=['stdout'], force=False, root_dir=None):
+    """
+        Main method to configure logging. Supported output formats are
+        tensorboard, stdout, csv, json. root_dir is the directory that
+        will contain other outputs from logging as subdirs. 
+    """
+    from torch_rl.utils import logger
+    if root_dir:
+        set_root(root_dir, force=force)
+
+    logger.configure(clear=clear, output_formats=output_formats)
+
+
+
+
+
+
+
 

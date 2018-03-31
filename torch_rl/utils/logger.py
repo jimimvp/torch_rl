@@ -14,6 +14,8 @@ import time
 import datetime
 import tempfile
 from collections import defaultdict
+from torch_rl.config import tensorboard_path, logging_path, benchmark_path, video_path
+
 
 LOG_OUTPUT_FORMATS = ['stdout', 'log', 'csv']
 # Also valid: json, tensorboard
@@ -26,6 +28,8 @@ ERROR = 40
 DISABLED = 5
 
 levels = [DEBUG, INFO, WARN, ERROR, DISABLED]
+
+
 
 def level_check(func):
     def dec(*args, **kwargs):
@@ -187,17 +191,24 @@ class TensorBoardOutputFormat(KVWriter):
             self.writer = None
 
 def make_output_format(format, ev_dir, log_suffix=''):
-    os.makedirs(ev_dir, exist_ok=True)
     if format == 'stdout':
         return HumanOutputFormat(sys.stdout)
     elif format == 'log':
+        ev_dir = logging_path()
+        os.makedirs(ev_dir, exist_ok=True)
         return HumanOutputFormat(osp.join(ev_dir, 'log%s.txt' % log_suffix))
     elif format == 'json':
+        ev_dir = benchmark_path()
+        os.makedirs(ev_dir, exist_ok=True)
         return JSONOutputFormat(osp.join(ev_dir, 'progress%s.json' % log_suffix))
     elif format == 'csv':
+        ev_dir = benchmark_path()
+        os.makedirs(ev_dir, exist_ok=True)
         return CSVOutputFormat(osp.join(ev_dir, 'progress%s.csv' % log_suffix))
     elif format == 'tensorboard':
-        return TensorBoardOutputFormat(osp.join(ev_dir, 'tb%s' % log_suffix))
+        ev_dir = tensorboard_path()
+        os.makedirs(ev_dir, exist_ok=True)
+        return TensorBoardOutputFormat(osp.join(ev_dir,  ev_dir + '%s' % log_suffix))
     else:
         raise ValueError('Unknown format specified: %s' % (format,))
 
@@ -403,7 +414,7 @@ class Logger(object):
 
 Logger.DEFAULT = Logger.CURRENT = Logger(dir=None, output_formats=[HumanOutputFormat(sys.stdout)])
 
-def configure(dir=None, format_strs=None, clear=True):
+def configure(dir=None, output_formats=None, clear=True):
     if dir is None:
         dir = os.getenv('TRL_LOG_DIR')
     if dir is None:
@@ -412,10 +423,10 @@ def configure(dir=None, format_strs=None, clear=True):
     assert isinstance(dir, str)
     os.makedirs(dir, exist_ok=True)
 
-    if format_strs is None:
+    if output_formats is None:
         strs = os.getenv('TRL_LOG_FORMAT')
-        format_strs = strs.split(',') if strs else LOG_OUTPUT_FORMATS
-    output_formats = [make_output_format(f, dir) for f in format_strs]
+        output_formats = strs.split(',') if strs else LOG_OUTPUT_FORMATS
+    output_formats = [make_output_format(f, dir) for f in output_formats]
 
     Logger.CURRENT = Logger(dir=dir, output_formats=output_formats, clear=clear)
     log('Logging to %s'%dir)
