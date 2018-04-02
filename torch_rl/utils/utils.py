@@ -4,7 +4,6 @@ import numpy as np
 from collections import namedtuple
 import datetime
 
-
 def to_tensor(ndarray, volatile=False, requires_grad=False, dtype=tor.FloatTensor, cuda=True):
     if cuda:
         return cuda_if_available(Variable(
@@ -24,24 +23,6 @@ def cuda_if_available(model):
     else:
         return model
 
-
-def gauss_weights_init(mu, std):
-    def init(m):
-        classname = m.__class__.__name__
-        if classname.find('Linear') != -1:
-            m.weight.data.normal_(mu, std)
-
-    return init
-
-
-def gauss_init(mu, std):
-    def init(m):
-        classname = m.__class__.__name__
-        if classname.find('Linear') != -1:
-            m.weight.data.normal_(mu, std)
-            m.bias.data.normal_(mu, std)
-
-    return init
 
 
 def to_input_state_goal(state, goal):
@@ -241,9 +222,43 @@ class Callback(object):
 
 
 
+def gauss_weights_init(mu, std):
+    def init(m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            m.weight.data.normal_(mu, std)
+
+    return init
 
 
+def xavier_normal_init(gain=1.):
 
+    def init(m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            tor.nn.init.xavier_normal(m.weight.data, gain)
+            m.bias.data.zero_()
+
+
+def xavier_uniform_init():
+
+    def init(m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            tor.nn.init.xavier_uniform(m.weight.data)
+            m.bias.data.zero_()
+
+    return init
+
+
+def gauss_init(mu, std):
+    def init(m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            m.weight.data.normal_(mu, std)
+            m.bias.data.normal_(mu, std)
+
+    return init
 
 
 
