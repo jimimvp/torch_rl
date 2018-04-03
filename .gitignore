@@ -110,3 +110,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# File for trying out the framework
+sanbox.py
+
+
