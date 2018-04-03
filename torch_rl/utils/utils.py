@@ -231,6 +231,15 @@ def gauss_weights_init(mu, std):
     return init
 
 
+def uniform_init(l=-1, r=1):
+    def init(m):
+        classname = m.__class__.__name__
+        if classname.find('Linear') != -1:
+            m.weight.data.uniform_(l, r)
+
+    return init
+
+
 def xavier_normal_init(gain=1.):
 
     def init(m):
