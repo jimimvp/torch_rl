@@ -47,7 +47,7 @@ class AdvantageEstimator(object):
 
         for _ in range(self.nsteps):
             actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
-            logpacs = -self.network.logprob(actions)
+            logpacs = self.network.logprob(actions)
 
             mb_obs.append(self.obs.copy().reshape(-1))
             mb_actions.append(actions.data.numpy().reshape(-1))
@@ -120,7 +120,7 @@ class GPUPPOTrainer(HorizonTrainer):
 
     def __init__(self, env, network, max_episode_len=500, gamma=.99,
                  replay_memory=GeneralisedlMemory(12000, window_length=1), lr=3e-4, n_steps=40,
-                 epsilon=0.2, optimizer=None, lmda=0.95, ent_coeff=0., n_update_steps=10, num_threads=5, n_minibatches=1):
+                 epsilon=0.2, optimizer=None, lmda=0.95, ent_coef=0., n_update_steps=10, num_threads=5, n_minibatches=1):
         super(GPUPPOTrainer, self).__init__(env)
 
         self.n_minibatches = n_minibatches
@@ -133,7 +133,7 @@ class GPUPPOTrainer(HorizonTrainer):
         self.optimizer = Adam(network.parameters(), lr=lr) if optimizer is None else optimizer
         self.goal_based = hasattr(env, "goal")
         self.network = network
-        self.ent_coeff = ent_coeff
+        self.ent_coef = ent_coef
         self.num_threads = num_threads
         self.n_update_steps = n_update_steps
         self.n_steps = n_steps
@@ -146,7 +146,7 @@ class GPUPPOTrainer(HorizonTrainer):
         nbatch_train = self.n_steps // self.n_minibatches
 
         self.network.cuda()
-        self.optimizer = Adam(self.network.parameters(), lr=self.lr) 
+        #self.optimizer = Adam(self.network.parameters(), lr=self.lr) 
 
         if states is None: # nonrecurrent version
             inds = np.arange(self.n_steps)
@@ -190,7 +190,7 @@ class GPUPPOTrainer(HorizonTrainer):
                     approxkl = .5 * tor.mean((logpac - OLDLOGPAC)**2)
 
 
-                    loss = v_loss  + pg_loss
+                    loss = v_loss  + pg_loss + self.ent_coef*entropy
 
                     #clipfrac = tor.mean((tor.abs(ratio - 1.0) > self.epsilon).type(tor.FloatTensor))
 
@@ -201,10 +201,12 @@ class GPUPPOTrainer(HorizonTrainer):
 
         #Push to CPU
         self.network.cpu()
-        logger.logkv("siglog", np.mean(self.network.siglog.data.numpy()))
+        logger.logkv("siglog", self.network.siglog.data.numpy())
         logger.logkv("pgloss", pg_loss.cpu().data.numpy())
         logger.logkv("vfloss", v_loss.cpu().data.numpy())
+        logger.logkv("vfloss", v_loss.cpu().data.numpy())
         logger.logkv("approxkl", approxkl.cpu().data.numpy())
+        logger.logkv("pentropy", entropy.cpu().data.numpy())
         logger.dumpkvs()
 
 
