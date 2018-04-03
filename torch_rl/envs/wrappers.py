@@ -180,10 +180,78 @@ class OsimArmWrapper(gym.ObservationWrapper):
 
 
 
+from multiprocessing import Process, Queue, Pipe
+from time import sleep
+
+class EnvProcess(Process):
+
+    def __init__(self, env, dt=1e-2):
+        self.queue = Queue()
+        self.info_pipe, info_pipe_child = Pipe()
+        self.reset_pipe, reset_pipe_child = Pipe()
+        self.env = env
+        super(EnvProcess, self).__init__(target=EnvProcess.env_loop, args=(env, 
+            self.queue, info_pipe_child, reset_pipe_child, dt))
+        self.start()
+
+    @staticmethod
+    def env_loop(env, action_queue, info_pipe, reset_pipe, dt):
+
+        action = np.zeros_like(env.action_space.sample())
+        state = env.reset()
+        info_pipe.send((state, 0, False, {}))
+        while(True):
+            action = action_queue.get() if not action_queue.empty() else action
+            inf = env.step(action)
+            info_pipe.send(inf)
+            sleep(dt)
+            if reset_pipe.poll(1e-4):
+                reset_pipe.recv()
+                state = env.reset()
+                reset_pipe.send(state)
+                action = np.zeros_like(env.action_space.sample())
+
+
+    def reset(self):
+        self.reset_pipe.send(True)
+        return self
+
+    def step(self, action):
+        if not action is None:
+            self.queue.put(action)
+        return self.info_pipe.recv()
+
+
+
+class AsyncEnvWrapper(gym.Wrapper):
+    """
+        Creates an asynchronous environment. The environment
+        reacts instantly when receiving the action but also
+        reacts on the last action received when not receiving
+        the action.
+    """
+    def __init__(self, env, dt=1e-2):
+        super(AsyncEnvWrapper, self).__init__(env)
+        # Queue for sending actions to the process
+        self.env_process = EnvProcess(env, dt)
+
+
+
+    def step(self, action):
+
+        return self.env_process.step(action)
+
+    def reset(self):
+
+        return self.env_process.reset()
+
+
+
+
 # import gym
-# env = BaselinesNormalize(gym.make("MountainCar-v0"))
+# env = AsyncEnvWrapper(gym.make("MountainCar-v0"))
 # env.reset()
-# for i in range(10):
+# for i in range(100):
 #     obs, _,_,_ = env.step(env.action_space.sample())
 #     print(obs)
 
