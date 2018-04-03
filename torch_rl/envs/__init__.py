@@ -2,6 +2,7 @@ from gym.envs.registration import register
 from .wrappers import *
 from .logger import *
 from .envs import *
+from .spiking import *
 
 register(
     id='BanditsX2-v0',
