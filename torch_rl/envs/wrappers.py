@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 from torch_rl.envs.utils import wrapped_by
-from torch_rl.utils import RunningMeanStd
+from torch_rl.utils.mpi_running_mean_std import RunningMeanStd
 
 
 
@@ -131,7 +131,7 @@ class ShapedRewardGoalEnv(GoalEnvWrapper):
 
 
 
-class BaselinesNormalize(gym.ObservationWrapper):
+class BaselinesNormalize(gym.Wrapper):
     """
         Normalization wrapper by running mean and standard deviation, as done in the OpenAI baselines
         implementation. This wrapper is made only for one environment, not a vector
@@ -148,8 +148,8 @@ class BaselinesNormalize(gym.ObservationWrapper):
         self.gamma = gamma
         self.epsilon = epsilon
 
-    def _step(self, action):
-        obs, rews, news, infos = self.env.step()
+    def step(self, action):
+        obs, rews, news, infos = self.env.step(action)
         self.ret = self.ret * self.gamma + rews
         obs = self._obfilt(obs)
         if self.ret_rms:
@@ -157,13 +157,22 @@ class BaselinesNormalize(gym.ObservationWrapper):
             rews = np.clip(rews / np.sqrt(self.ret_rms.std**2 + self.epsilon), -self.cliprew, self.cliprew)
         return obs, rews, news, infos
 
-    def _observation(self, obs):
+    def observation(self, obs):
         if self.ob_rms:
             self.ob_rms.update(obs)
             obs = np.clip((obs - self.ob_rms.mean) / (self.ob_rms.std + self.epsilon), -self.clipob, self.clipob)
             return obs
         else:
             return obs
+
+    def _obfilt(self, obs):
+        if self.ob_rms:
+            self.ob_rms.update(obs)
+            obs = np.clip((obs - self.ob_rms.mean) / np.sqrt(self.ob_rms.std**2 + self.epsilon), -self.clipob, self.clipob)
+            return obs
+        else:
+            return obs
+
 
 
 
