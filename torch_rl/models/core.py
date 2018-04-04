@@ -154,6 +154,7 @@ class Reservoir(SpikingNetwork):
         super(Reservoir, self).__init__(dt, sim_dt)
         self.model = nengo.Network(seed=60)
         self.state = np.zeros(input_size)
+        self.size = network_size
         with self.model as model:
             """
                 Network configurations.
@@ -218,8 +219,8 @@ class Reservoir(SpikingNetwork):
         return np.vstack(out)
 
     def reset(self):
-        self.sim.close()
-        self.sim = nengo.Simulator(network=self.model, dt=self.sim_dt)
+        self.sim.reset()
+        #self.sim = nengo.Simulator(network=self.model, dt=self.sim_dt)
 
 
 
