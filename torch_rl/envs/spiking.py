@@ -1,6 +1,6 @@
 import gym
 from torch_rl.models import Reservoir
-
+import numpy as np
 
 class ReservoirObservationWrapper(gym.Wrapper):
 
@@ -30,7 +30,7 @@ class ReservoirObservationWrapper(gym.Wrapper):
         obs = self.env.reset()
         self.reservoir.reset()
         spiking_obs = self.reservoir.forward(obs)
-        return spiking_obs
+        return np.asarray(spiking_obs, dtype=np.float32).flatten()
 
 
 
