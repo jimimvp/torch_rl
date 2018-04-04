@@ -44,6 +44,7 @@ class AdvantageEstimator(object):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_logpacs = [], [], [], [], [], []
         mb_state = self.state
         epinfos = []
+        self.done = False
 
         for _ in range(self.nsteps):
             actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
@@ -94,15 +95,8 @@ class AdvantageEstimator(object):
             mb_advs[t] = lastgaelam = delta + self.gamma * self.lam * nextnonterminal * lastgaelam
         mb_returns = mb_advs + mb_values
 
-        def sf01(arr):
-            """
-            swap and then flatten axes 0 and 1
-            """
-            s = arr.shape
-            return arr
 
-        return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_logpacs)),
-                mb_state)
+        return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_logpacs, mb_state
 
         # obs, returns, masks, actions, values, neglogpacs, states = runner.run()
 
@@ -143,6 +137,18 @@ class GPUPPOTrainer(HorizonTrainer):
 
 
         obs, returns, masks, actions, values, logpacs, states = self.advantage_estimator.run() #pylint: disable=E0632
+        #Normalize advantages over episodes
+        advs = returns - values
+        prev_ind = 0
+        for ind in np.argwhere(masks == True)[:, 0]:
+            episode_advs = advs[prev_ind:ind+1]
+            advs[prev_ind:ind+1] = (episode_advs - episode_advs.mean())/(episode_advs.std() + 1e-8)
+            prev_ind = ind+1
+
+        episode_advs = advs[prev_ind:-1]
+        advs[prev_ind:-1] = (episode_advs - episode_advs.mean())/(episode_advs.std() + 1e-8)
+    
+
         nbatch_train = self.n_steps // self.n_minibatches
 
         self.network.cuda()
@@ -155,13 +161,14 @@ class GPUPPOTrainer(HorizonTrainer):
                 for start in range(0, self.n_steps, nbatch_train):
                     end = start + nbatch_train
                     mbinds = inds[start:end]
-                    bobs, breturns, bmasks, bactions, bvalues, blogpacs = map(lambda arr: arr[mbinds], (obs, returns, masks, actions, values, logpacs))
-                    advs = breturns - bvalues
-                    advs = (advs - advs.mean()) / (advs.std() + 1e-8)
+                    bobs, breturns, bmasks, bactions, bvalues, blogpacs, badvs = map(lambda arr: arr[mbinds], (obs, returns, masks, actions, values, logpacs, advs))
+
+                    # This introduces bias since the advantages can be normalized over more episodes
+                    #advs = (advs - advs.mean()) / (advs.std() + 1e-8)
 
                     OBS = tt(bobs)
                     A = tt(bactions)
-                    ADV = tt(advs)
+                    ADV = tt(badvs)
                     R = tt(breturns)
                     OLDLOGPAC = tt(blogpacs)
                     OLDVPRED = tt(bvalues)
