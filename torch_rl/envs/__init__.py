@@ -1,6 +1,6 @@
 from gym.envs.registration import register
 from .wrappers import *
-from .logging import *
+from .logger import *
 from .envs import *
 
 register(
