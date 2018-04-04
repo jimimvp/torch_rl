@@ -22,7 +22,7 @@ import sys
 import os
 
 
-config.set_root('torch_rl_ppo_example', force=True)
+config.set_root('torch_rl_ppo_example', force=False)
 config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout'])
 # config.start_tensorboard()
 
@@ -38,7 +38,7 @@ with tor.cuda.device(1):
     network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
     network.apply(xavier_uniform_init())
 
-    trainer = GPUPPOTrainer(network=network, env=env, n_update_steps=10, 
+    trainer = GPUPPOTrainer(network=network, env=env, n_update_steps=5, 
         n_steps=2048, n_minibatches=32, lmda=.95, gamma=.99, lr=3e-4, epsilon=0.2, ent_coef=0.0)
     trainer.train(horizon=100000, max_episode_len=500)
 
