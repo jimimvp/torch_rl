@@ -44,7 +44,6 @@ class AdvantageEstimator(object):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_logpacs = [], [], [], [], [], []
         mb_state = self.state
         epinfos = []
-        self.done = False
 
         for _ in range(self.nsteps):
             actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
@@ -208,7 +207,7 @@ class GPUPPOTrainer(HorizonTrainer):
 
         #Push to CPU
         self.network.cpu()
-        logger.logkv("siglog", self.network.siglog.data.numpy())
+        logger.logkv("siglog", self.network.siglog.data.numpy()[0])
         logger.logkv("pgloss", pg_loss.cpu().data.numpy())
         logger.logkv("vfloss", v_loss.cpu().data.numpy())
         logger.logkv("vfloss", v_loss.cpu().data.numpy())

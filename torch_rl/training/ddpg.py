@@ -114,7 +114,7 @@ class DDPGTrainer(Trainer):
 
         logger.logkv('loss_actor', loss_actor.cpu().data.numpy())
         logger.logkv('loss_critic', loss_critic.cpu().data.numpy())
-
+        logger.logkv('epsilon', self.epsilon)
 
         soft_update(self.target_agent.policy_network, self.agent.policy_network, self.tau)
         soft_update(self.target_agent.critic_network, self.agent.critic_network, self.tau)
