@@ -20,13 +20,15 @@ from torch_rl import config
 
 import sys
 import os
+import roboschool
 
+env_name = 'RoboschoolReacher-v1'
 
-config.set_root('torch_rl_ppo_example', force=False)
+config.set_root('torch_rl_ppo_' + env_name.lower().split("-")[0], force=False)
 config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout'])
 # config.start_tensorboard()
 
-monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make('Pendulum-v0'))), 
+monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make(env_name))), 
     directory=os.path.join(config.root_path(), 'stats'), force=True, 
     video_callable=False, write_upon_reset=True)
 env = BaselinesNormalize(monitor)
