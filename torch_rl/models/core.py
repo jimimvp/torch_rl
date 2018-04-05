@@ -207,7 +207,8 @@ class Reservoir(SpikingNetwork):
         """
             Take the average of all steps as output.
         """
-        out = np.mean(out[-self.dt_steps:], axis=0)
+        #out = np.mean(out[-self.dt_steps:], axis=0)
+        out = out[-1]
         out = out.reshape(1, -1)
         return out
 
