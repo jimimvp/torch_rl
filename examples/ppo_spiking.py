@@ -16,19 +16,21 @@ from torch_rl.models import Reservoir
 # Use for logging of moving average episode rewards to console
 from torch_rl.envs import EnvLogger, ReservoirObservationWrapper
 from torch_rl import config
+import roboschool
 
 
 import sys
 import os
 
+env_name = 'RoboschoolReacher-v1'
 
-config.set_root('torch_rl_ppo_spiking_example', force=True)
+config.set_root('torch_rl_ppo_spiking_' + env_name.lower().split("-")[0], force=True)
 config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout', 'json'])
 # config.start_tensorboard()
 
 reservoir_size = 100
 
-env = EnvLogger(NormalisedActionsWrapper(gym.make('Pendulum-v0')))
+env = EnvLogger(NormalisedActionsWrapper(gym.make(env_name)))
 
 # Creating the reservoir for observation transformation
 reservoir = Reservoir(dt=0.01, sim_dt=0.005, input_size=env.observation_space.shape[0], network_size=reservoir_size, recursive=True,
@@ -38,15 +40,12 @@ reservoir = Reservoir(dt=0.01, sim_dt=0.005, input_size=env.observation_space.sh
 env = BaselinesNormalize(env)
 env = ReservoirObservationWrapper(env, reservoir)
 
-print(env.observation_space.shape)
-
-
 
 with tor.cuda.device(0):
     network = ActorCriticPPO([reservoir_size, 64, 64, env.action_space.shape[0]])
     network.apply(xavier_uniform_init())
 
-    trainer = GPUPPOTrainer(network=network, env=env, n_update_steps=5, 
-        n_steps=1024, n_minibatches=16, lmda=.95, gamma=.99, lr=3e-4, epsilon=0.1, ent_coef=0.0)
+    trainer = GPUPPOTrainer(network=network, env=env, n_update_steps=10, 
+        n_steps=2048, n_minibatches=32, lmda=.95, gamma=.99, lr=3e-4, epsilon=0.1, ent_coef=0.0)
     trainer.train(horizon=100000, max_episode_len=500)
 
