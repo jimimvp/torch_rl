@@ -49,14 +49,14 @@ class AdvantageEstimator(object):
             actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
             logpacs = self.network.logprob(actions)
 
-            mb_obs.append(self.obs.copy().reshape(-1))
-            mb_actions.append(actions.data.numpy().reshape(-1))
-            mb_values.append(values.detach().data.numpy().reshape(-1))
-            mb_logpacs.append(logpacs.data.numpy().reshape(-1))
+            mb_obs.append(self.obs.copy().flatten())
+            mb_actions.append(actions.data.numpy().flatten())
+            mb_values.append(values.detach().data.numpy().flatten())
+            mb_logpacs.append(logpacs.data.numpy().flatten())
 
             mb_dones.append(self.done)
 
-            obs, reward, self.done, infos = self.env.step(actions.data.numpy())
+            obs, reward, self.done, infos = self.env.step(actions.data.numpy().flatten())
             self.obs = obs
             self.global_step += 1
             mb_rewards.append(reward)
