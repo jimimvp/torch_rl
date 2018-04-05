@@ -88,11 +88,14 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
             self.layer_list.append(nn.Linear(architecture[i], architecture[i+1]))
             setattr(self, "fc" + str(i), self.layer_list[-1])
 
-        for i in range(len(architecture) - 1):
+        for i in range(len(architecture) - 2):
             self.layer_list_val.append(nn.Linear(architecture[i], architecture[i + 1]))
             setattr(self, "fc_val" + str(i), self.layer_list_val[-1])
 
-        #self.last_value_layer = nn.Linear(architecture[-1], 1)
+
+        self.layer_list_val.append(nn.Linear(architecture[-2], 1))
+        setattr(self, "fc_val" + str(len(architecture)-1), self.layer_list_val[-1])
+
 
         self.apply(weight_init)
 
