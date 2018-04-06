@@ -2,6 +2,7 @@ import gym
 import numpy as np
 from torch_rl.envs.utils import wrapped_by
 from torch_rl.utils.mpi_running_mean_std import RunningMeanStd
+from gym import spaces
 
 
 
@@ -175,26 +176,34 @@ class BaselinesNormalize(gym.Wrapper):
 
 
 
-
-class OsimArmWrapper(gym.ObservationWrapper):
+class ShrinkEnvWrapper(gym.ObservationWrapper):
     """
-    Wrapper that wraps the Stanford OpenSim environment to make it gym standard.
+        The wrapper takes indices of the observation that are going to be used
+        in the end and hides the rest i.e. forcing a POMDP process.
     """
 
+    def __init__(self, env, indices):
+        super(ShrinkEnvWrapper, self).__init__(env)
+        self.indices = indices
+        self.observation_space = spaces.Box(env.observation_space.high[indices], env.observation_space.low[indices])
 
 
-    def _observation(self, observation):
-        return observation[2:]
+    def observation(self, obs):
+        return obs[self.indices]
 
 
 
 
-# import gym
-# env = BaselinesNormalize(gym.make("MountainCar-v0"))
-# env.reset()
-# for i in range(10):
-#     obs, _,_,_ = env.step(env.action_space.sample())
-#     print(obs)
+if __name__ == '__main__':
+
+
+    env = ShrinkEnvWrapper(gym.make('Pendulum-v0'), indices=[0,1])
+    obs = env.reset()
+    print('Observation space: ', env.observation_space.shape)
+    print('Observation: ', obs.shape)
+    assert env.observation_space.shape[0] == 2 and obs.shape[0] == 2, 'Should be shrinked to shape of 2'
+    env.step(env.action_space.sample())
+
 
 
 
