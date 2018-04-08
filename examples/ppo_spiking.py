@@ -14,27 +14,52 @@ from torch_rl.utils import xavier_uniform_init
 from torch_rl.models import Reservoir
 
 # Use for logging of moving average episode rewards to console
-from torch_rl.envs import EnvLogger, ReservoirObservationWrapper
+from torch_rl.envs import EnvLogger, ReservoirObservationWrapper, ShrinkEnvWrapper
 from torch_rl import config
 import roboschool
 
 
 import sys
 import os
+import random
+import numpy as np
 
 env_name = 'RoboschoolReacher-v1'
+output_dir = env_name.lower().split("-")[0]
 
-config.set_root('torch_rl_ppo_spiking_' + env_name.lower().split("-")[0], force=True)
-config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout', 'json'])
+pomdp_indices = .6 #% original observations
+recursive_reservoir = True
+
+np.random.seed(456)
 # config.start_tensorboard()
 
-reservoir_size = 100
+reservoir_size = 200
+spectral_radius = .6
 
 env = EnvLogger(NormalisedActionsWrapper(gym.make(env_name)))
+if pomdp_indices:
+    output_dir+='_pomdp{}'.format(pomdp_indices)
+    pomdp_indices = int(pomdp_indices*env.observation_space.shape[0])
+    pomdp_indices = np.random.choice(np.arange(env.observation_space.shape[0]), pomdp_indices)
+    print('Chosen observation indices for pomdp: ', pomdp_indices)
+    env = ShrinkEnvWrapper(env, pomdp_indices)
+
+if not recursive_reservoir:
+    print('Using non-recursive reservoir')
+    output_dir+='_nor'
+else:
+    output_dir+='_recursive{}'.format(spectral_radius)
+
+
+
+config.set_root(output_dir, force=True)
+config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout', 'json'])
+
+
 
 # Creating the reservoir for observation transformation
-reservoir = Reservoir(dt=0.01, sim_dt=0.005, input_size=env.observation_space.shape[0], network_size=reservoir_size, recursive=True,
-                 spectral_radius=.6,noise=False, synapse_filter=15e-3)
+reservoir = Reservoir(dt=0.01, sim_dt=0.005, input_size=env.observation_space.shape[0], network_size=reservoir_size, recursive=recursive_reservoir,
+                 spectral_radius=spectral_radius,noise=False, synapse_filter=15e-3)
 
 # This wrapper transforms a normal observation to a spiking observation
 env = BaselinesNormalize(env)
