@@ -132,10 +132,10 @@ class SequentialMemory(Memory):
 
 
 
-class GeneralisedlMemory(SequentialMemory):
+class GeneralisedMemory(SequentialMemory):
 
     def __init__(self, limit,**kwargs):
-        super(GeneralisedlMemory, self).__init__(limit, **kwargs)
+        super(GeneralisedMemory, self).__init__(limit, **kwargs)
         self.extra_info = RingBuffer(limit)
         self.limit = limit
 
@@ -195,16 +195,12 @@ class GeneralisedlMemory(SequentialMemory):
         assert len(experiences) == batch_size
         return experiences
 
-    def _append(self, observation, action, reward, terminal, extra_info, training=True):
-            super(SequentialMemory, self).append(observation, action, reward, False, training=training)
+    def append(self, observation, action, reward, terminal, extra_info, training=True):
+            super(GeneralisedMemory, self).append(observation, action, reward, terminal, training=training)
 
             # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
             # and weather the next state is `terminal` or not.
             if training:
-                self.observations.append(observation)
-                self.actions.append(action)
-                self.rewards.append(reward)
-                self.terminals.append(terminal)
                 self.extra_info.append(extra_info)
 
 
@@ -221,9 +217,9 @@ class GeneralisedlMemory(SequentialMemory):
         extra_info = []
         for e in experiences:
             state0_batch.append(e[0])
-            state1_batch.append(e[1])
             reward_batch.append(e[2])
-            action_batch.append(e[3])
+            action_batch.append(e[1])
+            state1_batch.append(e[3])
             terminal1_batch.append(0. if e[4] else 1.)
             extra_info.append(e[-1])
 
