@@ -113,14 +113,16 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
 
         x = self.layer_list[-1](x)
 
-        self.means = self.tanh(x)
-        self.dist = Normal(self.means, tor.exp(self.siglog))
+        self._means = self.tanh(x)
+        self._dist = Normal(self._means, tor.exp(self.siglog))
 
-        self.sampled = self.dist.rsample()
+        self.sampled = self._dist.rsample()
         x = self.sampled
 
         return x
 
+    def mu(self):
+        return self.means
 
     def value_forward(self, x):
 
@@ -157,13 +159,13 @@ class ActorCriticPPO(StochasticContinuousNeuralNet):
         return self.sigmas
 
     def mu(self):
-        return self.means
+        return self._means
 
     def logprob(self, values):
-        return self.dist.log_prob(values)
+        return self._dist.log_prob(values)
 
     def entropy(self):
-        return self.dist.entropy()
+        return self._dist.entropy()
 
 
 

@@ -102,6 +102,22 @@ class SimpleNetwork(NeuralNet):
         return x
 
 
+class QNetwork(SimpleNetwork):
+    """
+        Just adds a call method for simpler state and action passing.
+    """
+
+    def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),
+            activation_functions=None):
+        super(QNetwork, self).__init__(architecture, weight_init=weight_init,
+            activation_functions=activation_functions)
+
+ 
+    def __call__(self, s, a):
+
+        x = tor.cat((s,a), 1)
+        return self.forward(x)
+
 
 class PolicyAHG(StochasticNeuralNet):
 
