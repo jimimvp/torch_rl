@@ -1,5 +1,4 @@
 from torch_rl.training.core import HorizonTrainer, mse_loss
-from torch_rl.memory import GeneralisedlMemory
 from torch.optim import Adam
 from torch_rl.utils import to_tensor as tt
 import torch as tor
@@ -111,8 +110,7 @@ class GPUPPOTrainer(HorizonTrainer):
     mvavg_reward = deque(maxlen=100)
 
 
-    def __init__(self, env, network, max_episode_len=500, gamma=.99,
-                 replay_memory=GeneralisedlMemory(12000, window_length=1), lr=3e-4, n_steps=40,
+    def __init__(self, env, network, max_episode_len=500, gamma=.99, lr=3e-4, n_steps=40,
                  epsilon=0.2, optimizer=None, lmda=0.95, ent_coef=0., n_update_steps=10, num_threads=5, n_minibatches=1):
         super(GPUPPOTrainer, self).__init__(env)
 
