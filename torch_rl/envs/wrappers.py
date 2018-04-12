@@ -79,25 +79,52 @@ class GoalEnvWrapper(gym.RewardWrapper, NormalisedActionsWrapper):
         return self._goal
 
 
-class SparseRewardGoalEnv(GoalEnvWrapper):
+class GoalEnv(gym.Wrapper):
     """
     Wrapper that creates sparse rewards 0 and 1 for the environment.
     """
 
-    def __init__(self, *args, **kwargs):
-        self.precision = kwargs.get("precision", 1e-2)
-        del kwargs['precision']
-        super(SparseRewardGoalEnv, self).__init__(*args,**kwargs)
-        if not wrapped_by(self.env, NormalisedObservationsWrapper):
-            self.normalising_factor = self.observation_space.high - self.observation_space.low
-        else:
-            self.normalising_factor = 2.
+    def __init__(self, env, target_indices, curr_indices, precision=1e-2, sparse=False):
+        super(GoalEnv, self).__init__(env)
+        assert len(target_indices) == len(curr_indices)
 
-    def _reward(self, reward):
-        if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
-            return 0
+        self.target_indices = target_indices
+        self.curr_indices = curr_indices
+        self.precision = precision
+        self.sparse = sparse
+
+    def step(self, action):
+        obs, reward, done, inf = self.env.step(action)
+
+        if self.sparse:
+            reward = float(np.allclose(obs[self.curr_indices], obs[self.target_indices], atol=self.precision))-1.
         else:
-            return 1
+            reward = .5 * np.mean((obs[self.curr_indices] - obs[self.target_indices])**2)
+
+        return obs, reward, done, inf
+
+
+
+# class GoalEnv(GoalEnvWrapper):
+#     """
+#     Wrapper that creates sparse rewards 0 and 1 for the environment.
+#     """
+
+#     def __init__(self, *args, **kwargs):
+#         self.precision = kwargs.get("precision", 1e-2)
+#         del kwargs['precision']
+#         super(SparseRewardGoalEnv, self).__init__(*args,**kwargs)
+#         if not wrapped_by(self.env, NormalisedObservationsWrapper):
+#             self.normalising_factor = self.observation_space.high - self.observation_space.low
+#         else:
+#             self.normalising_factor = 2.
+
+#     def _reward(self, reward):
+#         if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
+#             return 0
+#         else:
+#             return 1
+
 
 
 class NormalisedRewardWrapper(gym.RewardWrapper):
