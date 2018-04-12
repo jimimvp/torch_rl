@@ -31,6 +31,7 @@ pomdp_indices = .6 #% original observations
 recursive_reservoir = True
 
 np.random.seed(456)
+tor.manual_seed(456)
 # config.start_tensorboard()
 
 reservoir_size = 200
