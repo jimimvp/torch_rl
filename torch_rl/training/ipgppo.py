@@ -141,7 +141,7 @@ class IPGGPUPPOTrainer(HorizonTrainer):
         self.epsilon = epsilon
         self.gamma = gamma
         self.lmda = lmda
-        self.optimizer = Adam(policy_network.parameters(), lr=lr, weight_decay=0.1) if optimizer is None else optimizer
+        self.optimizer = Adam(policy_network.parameters(), lr=lr, weight_decay=0.001) if optimizer is None else optimizer
         self.goal_based = hasattr(env, "goal")
         self.policy_network = policy_network
         self.ent_coef = ent_coef
@@ -154,7 +154,7 @@ class IPGGPUPPOTrainer(HorizonTrainer):
         self.critic_network = critic_network
         self.target_critic_network = cuda_if_available(copy.deepcopy(self.critic_network))
         self.target_policy_network = cuda_if_available(copy.deepcopy(self.policy_network))
-        self.critic_optimizer = Adam(critic_network.parameters(), lr=3e-4, weight_decay=0.1)
+        self.critic_optimizer = Adam(critic_network.parameters(), lr=3e-4, weight_decay=0.001)
 
 
     def _off_policy_loss(self, batch_size): 
@@ -171,23 +171,28 @@ class IPGGPUPPOTrainer(HorizonTrainer):
 
         #import pdb; pdb.set_trace()
         a2, v_pred = self.target_policy_network(s2)
+        # Take deterministic step by taking the mean of the distribution
         a2 = self.target_policy_network.mu()
 
         q = self.critic_network(s1, a1)
-        q_clipped = oldq + tor.clamp(q - oldq, -self.epsilon, self.epsilon)
-        q_target =  self.target_critic_network(s2,a2) 
-        q = tor.max(q_clipped, q)
-        critloss = .5 * tor.mean(( r + self.gamma * q - q)**2)
+        #q_clipped = oldq + tor.clamp(q - oldq, -self.epsilon, self.epsilon)
+        q_target =  r + self.gamma*(self.target_critic_network(s2,a2))
 
+        critloss1 = (q_target - q)**2
+        # critloss2 = (q_target - q_clipped)**2
+        # critloss = .5 * tor.mean(tor.max(critloss1, critloss2))
+
+        critloss = .5 * tor.mean(critloss1)
 
         a, v = self.policy_network(s1)
         a = self.policy_network.mu()
+
         ratio =  tor.exp(self.policy_network.logprob(a) - oldlogpac)
         qestimate = self.critic_network(s1, a)
 
-        # pgloss1 = -qestimate * ratio
-        # pgloss2 = -qestimate * tor.clamp(ratio, 1. - self.epsilon, 1. + self.epsilon)
-        # pgloss = -tor.mean(tor.max(pgloss1, pgloss2))
+        #pgloss1 = -qestimate * ratio
+        #pgloss2 = -qestimate * tor.clamp(ratio, 1. - self.epsilon, 1. + self.epsilon)
+        #pgloss = -tor.mean(tor.max(pgloss1, pgloss2))
         pgloss = -tor.mean(qestimate)
 
 
@@ -198,6 +203,7 @@ class IPGGPUPPOTrainer(HorizonTrainer):
         logger.logkv("qloss", critloss.cpu().data.numpy())
         logger.logkv("meanq", mean_q_estimate.cpu().data.numpy())
         logger.logkv("ratio", mean_ratio.cpu().data.numpy())
+        logger.logkv("reward_mean", r.cpu().data.numpy().mean())
 
         return pgloss + critloss
 
@@ -294,6 +300,7 @@ class IPGGPUPPOTrainer(HorizonTrainer):
                     self.critic_optimizer.step()
 
                     # Soft updates for target policies and critic
+                    # Soft updates of critic don't help
                     soft_update(self.target_policy_network, self.policy_network, self.tau)
                     soft_update(self.target_critic_network, self.critic_network, self.tau)
 
