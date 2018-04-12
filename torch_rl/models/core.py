@@ -102,15 +102,40 @@ class SimpleNetwork(NeuralNet):
         return x
 
 
-class QNetwork(SimpleNetwork):
+class QNetwork(NeuralNet):
     """
         Just adds a call method for simpler state and action passing.
     """
 
     def __init__(self, architecture, weight_init=gauss_weights_init(0,0.02),
             activation_functions=None):
-        super(QNetwork, self).__init__(architecture, weight_init=weight_init,
-            activation_functions=activation_functions)
+        super(NeuralNet, self).__init__()
+        self.activation_functions = activation_functions
+        self.layer_list = []
+        for i in range(len(architecture)-1):
+            self.layer_list.append(nn.Linear(architecture[i], architecture[i+1]))
+            setattr(self, "fc" + str(i), self.layer_list[-1])
+
+        #self.last_linear = nn.Linear(architecture[-1], 1)
+        self.apply(weight_init)
+
+    def forward(self, x):
+        if self.activation_functions:
+            for i, func in enumerate(self.activation_functions):
+                x = func(self.layer_list[i](x))
+        else:
+            for i, layer in enumerate(self.layer_list):
+                x = self.relu(layer(x))
+
+        i+=1
+        while i < len(self.layer_list):
+            x = self.layer_list[i](x)
+            i+=1
+
+       # x = self.last_linear(x)
+
+        return x
+
 
  
     def __call__(self, s, a):

@@ -24,9 +24,13 @@ import sys
 import os
 import roboschool
 
-env_name = 'RoboschoolReacher-v1'
+env_name = 'RoboschoolAnt-v1'
+# Interpolation parameter v * ppo_gradient + (1-v) * off_policy_gradient
+v = 0.5
+np.random.seed(456)
+tor.manual_seed(456)
 
-config.set_root('torch_rl_ipgppo_' + env_name.lower().split("-")[0], force=True)
+config.set_root('torch_rl_ipgppo_' + env_name.lower().split("-")[0] + "_v={}".format(v), force=True)
 config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout'])
 # config.start_tensorboard()
 
@@ -49,6 +53,8 @@ tt = to_tensor
 with tor.cuda.device(1):
     network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
     network.apply(xavier_uniform_init())
+
+    # The Q network should be proportional in size to the policy, because the deteministic gradient becomes too big 
     critic = cuda_if_available(
     QNetwork(architecture=[num_observations + num_actions, 64, 64, 1],
                   activation_functions=[tanh, tanh, tanh]))
@@ -62,6 +68,6 @@ with tor.cuda.device(1):
 
     trainer = IPGGPUPPOTrainer(policy_network=network, critic_network=critic, env=env, n_update_steps=5, 
         n_steps=2048, n_minibatches=32, lmda=.95, gamma=.99, lr=3e-4, epsilon=0.2, ent_coef=0.0,
-        tau=1e-3, v=1., replay_memory=replay_memory)
+        tau=100e-3, v=v, replay_memory=replay_memory)
     trainer.train(horizon=100000, max_episode_len=500)
 
