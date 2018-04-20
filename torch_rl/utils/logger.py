@@ -14,7 +14,7 @@ import time
 import datetime
 import tempfile
 from collections import defaultdict
-from torch_rl.config import tensorboard_path, logging_path, benchmark_path, video_path
+from torch_rl.config import tensorboard_path, logging_path, benchmark_path, video_path, root_path
 
 
 LOG_OUTPUT_FORMATS = ['stdout', 'log', 'csv']
@@ -573,6 +573,14 @@ class LoggerFactory(object):
         for logger in self.loggers:
             logger.close() 
 
+
+
+
+def save_params(**kwargs):
+    import json
+    dir = root_path()
+    with open(os.path.join(dir, 'params.json'), 'w') as f:
+        json.dump(kwargs, f, indent=4)
 
 
 
