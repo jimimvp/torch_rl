@@ -33,7 +33,6 @@ def env_info(env):
 
 
 import numpy as np
-import roboschool
 import gym
 
 def potential_goal_indices(env):

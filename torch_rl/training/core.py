@@ -80,6 +80,7 @@ class Trainer(object):
 
 
 from multiprocessing import Lock
+import time
 
 class HorizonTrainer(Trainer):
     """
@@ -99,6 +100,9 @@ class HorizonTrainer(Trainer):
 
     def train(self, horizon, max_episode_len, render=False, verbose=True, callbacks=[]):
         self.callbacks = callbacks
+        for callback in callbacks:
+            if not hasattr(callback, 'dt'):
+                callback.dt = 100
         self.estep = 0
 
         self._warmup()
@@ -108,9 +112,13 @@ class HorizonTrainer(Trainer):
         self.state = self.env.reset()
         for self.hstep in range(horizon):
 
+            time_start = time.time()
             self._horizon_step()
+            time_end = time.time()
+            dt = time_end - time_start
+            logger.logkv('stime', dt/60.)
             self._horizon_step_end()
-
+     
     def _horizon_step(self):
         raise NotImplementedError()
 
@@ -133,9 +141,10 @@ class HorizonTrainer(Trainer):
 
         logger.logkv('horizon_step', self.hstep)
         for callback in self.callbacks:
-            callback.step(episode=self.episode, step=self.hstep, reward=self.acc_reward, **kwargs)
+                if self.hstep % callback.dt == 0:
+                    callback.step(episode=None, step=self.hstep, reward=None)
 
-        
+
 def reward_transform(env, obs, r, done, **kwargs):
     goal = kwargs.get('goal', None)
     if not goal is None:

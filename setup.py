@@ -8,5 +8,7 @@ setup(
    author='Marin Vlastelica',
    author_email=None,
    packages=find_packages(),
-   install_requires=['torch', 'numpy', 'pandas', 'nengo', 'nengolib', 'mpi4py'],
+   data_files=[
+             ("torch_rl/default.config")],
+   install_requires=['torch', 'numpy', 'pandas', 'mpi4py'],
 )

@@ -85,6 +85,9 @@ def loop_print(prt, r):
 def timestamp():
     return datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 
+def compact_timestamp():
+    return datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+
 
 
 # Based on http://math.stackexchange.com/questions/1287634/implementing-ornstein-uhlenbeck-in-matlab
@@ -271,7 +274,65 @@ def gauss_init(mu, std):
 
 
 
+import argparse
+cparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+
+
+class UniversalParser(object):
+    """
+        Store everything as a string except bool arguments
+        so that you can evaluate them
+    """
+    parser = cparser
+    def __init__(self, parser):
+        self.parser = parser
+
+    def parse_args(self):
+        self.args = self.parser.parse_args()
+        for arg in var(self.args):
+            try:
+                setattr(arg, eval(str(getattr(self.args, arg))))
+            except TypeError as err:
+                setattr(arg, getattr(self.args, arg))
+
+        return self.args
+
+    def add_argument(self, name, default):
+        if isinstance(default, bool):
+            self.parser.add_argument('--'+name, default=default, action='store_false' if default else 'store_true')
+        else:
+            print('Adding ' , name)
+            self.parser.add_argument('--'+name, default=str(default), type=str)
+
+def addarg(name, type, default=None, info=None):
+    cparser = UniversalParser.parser
+
+    if isinstance(default, list):
+        cparser.add_argument('--'+name, default=default, nargs='+', type=type, help=info)
+    elif type == bool and not default:
+        cparser.add_argument('--'+name, default=default, action='store_true', help=info)
+    elif type == bool and default:
+        cparser.add_argument('--'+name, default=default, action='store_false', help=info)
+    else:
+        cparser.add_argument('--'+name, default=default, type=type, help=info)
+
+
+def init_parser(description=""):
+
+    UniversalParser.parser = argparse.ArgumentParser(description=description)
+
+def cmdl_args():
+    return UniversalParser.parser.parse_args()
+
+def adduarg(name, default=None):
+    parser = UniversalParser.parser
+    addarg(name, default=str(default), type=str)
+
+
+#Init default parser without description
+init_parser()
+parser = UniversalParser.parser
 
 
 

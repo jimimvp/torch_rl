@@ -31,7 +31,7 @@ config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout'])
 monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make(env_name))), 
     directory=os.path.join(config.root_path(), 'stats'), force=True, 
     video_callable=False, write_upon_reset=True)
-env = BaselinesNormalize(monitor)
+env = RunningMeanStdNormalize(monitor)
 print(env.observation_space.shape)
 
 

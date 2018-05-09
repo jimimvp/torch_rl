@@ -2,14 +2,29 @@ import os
 import json
 from collections import namedtuple
 import torch_rl
-from torch_rl.utils import timestamp
+from torch_rl.utils import compact_timestamp
 import shutil
+import numpy as np
 
 module_path = os.path.abspath(os.path.dirname(torch_rl.__file__))
+
+
+default_config={ 
+    "paths": {
+        "tensorboard" : "tensorboard",
+        "logging" : "logs",
+        "benchmark" : "benchmark",
+        "video" : "video"
+    }
+}
+
 default_config_path = os.path.join(module_path, 'default.config')
 
-with open(default_config_path) as f:
-    default_config = json.load(f)
+try:
+    with open(default_config_path) as f:
+        default_config = json.load(f)
+except Exception as e:
+    pass
 
 def check_main_path_defined(func):
     def check(*args, **kwargs):
@@ -95,8 +110,8 @@ class Config(object):
         a training session.
     """
 
-    DEFAULT_DICT=default_config
-    CURRENT = None
+    DEFAULT_DICT= default_config
+    CURRENT = default_config
 
     def __init__(self, **kwargs):
 
@@ -111,6 +126,17 @@ class Config(object):
             return getattr(cls.CURRENT, key)
         else:
             raise Exception("Config key [{}] unknown".format(key))
+
+import torch as tor
+import numpy as np
+import random
+
+def set_global_seed(seed):
+    np.random.seed(seed)
+    tor.manual_seed(seed)
+    random.seed(seed)
+    Config.CURRENT.seed = seed
+
 
 def load_config(config_path=default_config_path):
     
@@ -138,9 +164,12 @@ def set_root(root, force=False):
         if os.path.isdir(Config.CURRENT.target_path):
             shutil.rmtree(Config.CURRENT.target_path)
         os.makedirs(Config.CURRENT.target_path)
+    elif os.path.isdir(Config.CURRENT.target_path):
+        Config.CURRENT.target_path = Config.CURRENT.target_path + '_' + compact_timestamp()
+        os.makedirs(Config.CURRENT.target_path)
 
 Config.CURRENT = Config(**default_config)
-set_root('training_data_' + timestamp())
+set_root('training_data_' + compact_timestamp())
 
 
 @check_main_path_defined
@@ -154,7 +183,7 @@ def configure_logging(clear=False, output_formats=['stdout'], force=False, root_
     if root_dir:
         set_root(root_dir, force=force)
 
-    logger.configure(clear=clear, output_formats=output_formats)
+    logger.configure(root_path(), clear=clear, output_formats=output_formats)
 
 
 def start_tensorboard():
@@ -162,8 +191,10 @@ def start_tensorboard():
     p = Popen(['tensorboard', '--logdir', tensorboard_path()])
 
 
+set_global_seed(int(np.random.uniform(0, 100000)))
 
-
+def get_global_seed():
+    return Config.CURRENT.seed
 
 
 

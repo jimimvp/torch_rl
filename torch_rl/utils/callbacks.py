@@ -4,7 +4,7 @@ import os
 class CheckpointCallback(Callback):
 
 
-    def __init__(self, models=None, save_path=".", interval=1, episodewise=True):
+    def __init__(self, models=None, save_path=".", interval=100, episodewise=True, dt=1):
         """
         Init the object
         :param models:      dict of name: model pairs, the names are used for saving
@@ -16,6 +16,7 @@ class CheckpointCallback(Callback):
         self.models = models
         self.interval = interval
         self.save_path = os.path.join(save_path, "checkpoints")
+        self.dt = dt
 
         os.makedirs(save_path, exist_ok=True)
 

@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 from torch_rl.envs.utils import wrapped_by
-from torch_rl.utils.mpi_running_mean_std import RunningMeanStd
+from torch_rl.utils import RunningMeanStd
 from gym import spaces
 
 
@@ -78,26 +78,33 @@ class GoalEnvWrapper(gym.RewardWrapper, NormalisedActionsWrapper):
     def goal(self):
         return self._goal
 
+from torch_rl.utils import logger
 
-class SparseRewardGoalEnv(GoalEnvWrapper):
+class GoalEnv(gym.Wrapper):
     """
-    Wrapper that creates sparse rewards 0 and 1 for the environment.
+    Wrapper that creates sparse rewards 0 and 1 for the environment or a distance
+    reward in case we want it shaped.
     """
 
-    def __init__(self, *args, **kwargs):
-        self.precision = kwargs.get("precision", 1e-2)
-        del kwargs['precision']
-        super(SparseRewardGoalEnv, self).__init__(*args,**kwargs)
-        if not wrapped_by(self.env, NormalisedObservationsWrapper):
-            self.normalising_factor = self.observation_space.high - self.observation_space.low
-        else:
-            self.normalising_factor = 2.
+    def __init__(self, env, target_indices, curr_indices, precision=1e-2, sparse=False, log=False):
+        super(GoalEnv, self).__init__(env)
+        assert len(target_indices) == len(curr_indices)
 
-    def _reward(self, reward):
-        if np.any((np.abs(self._goal - self._s[self.indices])/self.normalising_factor) > self.precision):
-            return 0
+        self.target_indices = target_indices
+        self.curr_indices = curr_indices
+        self.precision = precision
+        self.sparse = sparse
+        self.log = log
+
+    def step(self, action):
+        obs, reward, done, inf = self.env.step(action)
+        sparse_reward = float(np.allclose(obs[self.curr_indices], obs[self.target_indices], atol=self.precision))-1.
+        if self.sparse:
+            reward = sparse_reward
         else:
-            return 1
+            reward = .5 * np.mean((obs[self.curr_indices] - obs[self.target_indices])**2)
+            
+        return obs, reward, done, inf
 
 
 class NormalisedRewardWrapper(gym.RewardWrapper):
@@ -132,14 +139,14 @@ class ShapedRewardGoalEnv(GoalEnvWrapper):
 
 
 
-class BaselinesNormalize(gym.Wrapper):
+class RunningMeanStdNormalize(gym.Wrapper):
     """
         Normalization wrapper by running mean and standard deviation, as done in the OpenAI baselines
         implementation. This wrapper is made only for one environment, not a vector
         of environments as in the baselines implementation.
     """
     def __init__(self, env, ob=True, ret=True, clipob=10., cliprew=10., gamma=0.99, epsilon=1e-8):
-        super(BaselinesNormalize, self).__init__(env)
+        super(RunningMeanStdNormalize, self).__init__(env)
         self.env = env
         self.ob_rms = RunningMeanStd(shape=()) if ob else None
         self.ret_rms = RunningMeanStd(shape=()) if ret else None
@@ -204,6 +211,80 @@ if __name__ == '__main__':
     assert env.observation_space.shape[0] == 2 and obs.shape[0] == 2, 'Should be shrinked to shape of 2'
     env.step(env.action_space.sample())
 
+from multiprocessing import Process, Queue, Pipe
+from time import sleep
+
+class EnvProcess(Process):
+
+    def __init__(self, env, dt=1e-2):
+        self.queue = Queue()
+        self.info_pipe, info_pipe_child = Pipe()
+        self.reset_pipe, reset_pipe_child = Pipe()
+        self.env = env
+        super(EnvProcess, self).__init__(target=EnvProcess.env_loop, args=(env, 
+            self.queue, info_pipe_child, reset_pipe_child, dt))
+        self.start()
+
+    @staticmethod
+    def env_loop(env, action_queue, info_pipe, reset_pipe, dt):
+
+        action = np.zeros_like(env.action_space.sample())
+        state = env.reset()
+        info_pipe.send((state, 0, False, {}))
+        while(True):
+            action = action_queue.get() if not action_queue.empty() else action
+            inf = env.step(action)
+            info_pipe.send(inf)
+            sleep(dt)
+            if reset_pipe.poll(1e-4):
+                reset_pipe.recv()
+                state = env.reset()
+                reset_pipe.send(state)
+                action = np.zeros_like(env.action_space.sample())
+
+
+    def reset(self):
+        self.reset_pipe.send(True)
+        return self
+
+    def step(self, action):
+        if not action is None:
+            self.queue.put(action)
+        return self.info_pipe.recv()
+
+
+
+class AsyncEnvWrapper(gym.Wrapper):
+    """
+        Creates an asynchronous environment. The environment
+        reacts instantly when receiving the action but also
+        reacts on the last action received when not receiving
+        the action.
+    """
+    def __init__(self, env, dt=1e-2):
+        super(AsyncEnvWrapper, self).__init__(env)
+        # Queue for sending actions to the process
+        self.env_process = EnvProcess(env, dt)
+
+
+
+    def step(self, action):
+
+        return self.env_process.step(action)
+
+    def reset(self):
+
+        return self.env_process.reset()
+
+
+
+
+# import gym
+# env = AsyncEnvWrapper(gym.make("MountainCar-v0"))
+# env.reset()
+# for i in range(100):
+#     obs, _,_,_ = env.step(env.action_space.sample())
+#     print(obs)
 
 
 

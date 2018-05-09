@@ -51,21 +51,3 @@ class GaussianPolicy(StochasticContinuousNeuralNet):
 
     def log_prob(self, values):
         return self.dist.log_prob(values)
-
-
-
-
-# #Test
-# import numpy as np
-# architecture = [6, 10]
-# gauss_policy = GaussianPolicy(architecture=architecture)
-#
-# loss = 0
-# for i in range(100):
-#     res = gauss_policy.forward(to_tensor(np.random.normal(3,1,(5,6)), cuda=False))
-#     sigma = gauss_policy.sigma()
-#     mean = gauss_policy.mu()
-#     loss += tor.sum(res)
-#     print(sigma, mean)
-#
-# loss.backward()

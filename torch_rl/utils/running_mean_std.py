@@ -30,5 +30,5 @@ class RunningMeanStd(object):
 
         self.mean = new_mean
         self.var = new_var
-        self.std = np.sqrt(var)
+        self.std = np.sqrt(self.var)
         self.count = new_count

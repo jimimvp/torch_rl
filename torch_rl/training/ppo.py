@@ -116,7 +116,6 @@ class GPUPPOTrainer(HorizonTrainer):
 
         self.n_minibatches = n_minibatches
         self.lr = lr
-        self.replay_memory = replay_memory
         self.max_episode_len = max_episode_len
         self.epsilon = epsilon
         self.gamma = gamma
@@ -229,7 +228,7 @@ if __name__ == '__main__':
     logger.configure(clear=False)
     monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make("Pendulum-v0"))), directory="./stats", force=True, 
         video_callable=False, write_upon_reset=True)
-    env = BaselinesNormalize(monitor)
+    env = RunningMeanStdNormalize(monitor)
     print(env.observation_space.shape)
 
 

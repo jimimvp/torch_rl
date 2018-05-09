@@ -86,11 +86,11 @@ class SequentialMemory(Memory):
             terminal1_batch.append(0. if e.terminal1 else 1.)
 
         # Prepare and validate parameters.
-        state0_batch = np.array(state0_batch).reshape(batch_size, -1)
-        state1_batch = np.array(state1_batch).reshape(batch_size, -1)
-        terminal1_batch = np.array(terminal1_batch).reshape(batch_size, -1)
-        reward_batch = np.array(reward_batch).reshape(batch_size, -1)
-        action_batch = np.array(action_batch).reshape(batch_size, -1)
+        state0_batch = np.array(state0_batch, dtype=np.float32).reshape(batch_size, -1)
+        state1_batch = np.array(state1_batch, dtype=np.float32).reshape(batch_size, -1)
+        terminal1_batch = np.array(terminal1_batch, dtype=np.bool).reshape(batch_size, -1)
+        reward_batch = np.array(reward_batch, dtype=np.float32).reshape(batch_size, -1)
+        action_batch = np.array(action_batch, dtype=np.float32).reshape(batch_size, -1)
 
         if self.goals.length > 0:
             return state0_batch, goal_batch, action_batch, reward_batch, state1_batch, terminal1_batch
@@ -235,14 +235,4 @@ class GeneralisedMemory(SequentialMemory):
             return state0_batch, goal_batch, action_batch, reward_batch, state1_batch, terminal1_batch
         else:
             return state0_batch, action_batch, reward_batch, state1_batch, terminal1_batch, extra_info_batch
-
-
-# memory = GeneralisedSequentialMemory(limit=10000)
-#
-# for i in range(400):
-#     a = np.zeros(10)
-#     memory.append(a, a, 4., False, [0.1, 3.5])
-#
-# s0, a, r, s1, terminal, ei = memory.sample_and_split(40)
-#
 

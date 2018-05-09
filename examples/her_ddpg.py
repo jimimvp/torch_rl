@@ -2,16 +2,18 @@ import gym
 
 from torch_rl.models import SimpleNetwork
 from torch_rl.envs import NormalisedActionsWrapper
-from torch_rl.memory import SequentialMemory
+from torch_rl.memory import HindsightMemory, SequentialMemory
 from torch_rl.training import DDPGTrainer
 from torch_rl.utils.stats import TrainingStatsCallback
 from torch_rl.utils import cuda_if_available, gauss_init
 from torch_rl.utils.callbacks import CheckpointCallback
 from torch_rl.utils import timestamp
 from torch_rl.envs.wrappers import RunningMeanStdNormalize
-from torch_rl.envs import EnvLogger
+from torch_rl.envs import EnvLogger, GoalEnv
+from gym.wrappers import Monitor
 
 from torch_rl import config
+import numpy as np
 import os
 
 import torch as tor
@@ -37,14 +39,36 @@ actor_learning_rate = 1e-4
 critic_learning_rate = 1e-3
 middle_layer_size = [64, 64]
 weight_init_sigma = 0.003
+env_name = 'TRLRoboschoolReacher-v1'
+goal_indices = [0,1]
+sparse = True
+hindsight = True
 
-replay_memory = SequentialMemory(limit=6000000, window_length=1)
 
-config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout'], root_dir='ddpg_' + timestamp(), force=True)
+replay_memory = HindsightMemory(limit=1000000, goal_indices=goal_indices) if hindsight else SequentialMemory(limit=1000000)
+
+# Interpolation parameter v * ppo_gradient + (1-v) * off_policy_gradient
+np.random.seed(456)
+tor.manual_seed(456)
+
+root_dir = 'torch_rl_her_ddpg_' + env_name.lower().split("-")[0]
+if sparse:
+  root_dir += '_sparse'
+
+if hindsight:
+  root_dir += '_hindsight'
 
 
-env = EnvLogger(NormalisedActionsWrapper(gym.make('Pendulum-v0')))
+config.set_root(root_dir, force=True)
+config.configure_logging(clear=False, output_formats=['tensorboard', 'stdout', 'json'])
+# config.start_tensorboard()
+
+env = EnvLogger(NormalisedActionsWrapper(gym.make(env_name)))
+env = GoalEnv(RunningMeanStdNormalize(env), target_indices=[0, 1], curr_indices=[2, 3], sparse=sparse, precision=1e-1)
+#Make it a sparse goal environment, precision is absolute error tolerance to target
+
 env.reset()
+
 num_actions = env.action_space.shape[0]
 num_observations = env.observation_space.shape[0]
 relu, tanh = tor.nn.ReLU(), tor.nn.Tanh()
