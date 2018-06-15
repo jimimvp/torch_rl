@@ -8,6 +8,7 @@ Reinforcement learning algorithms for spiking networks and artificial neural net
 2. Stochastic policy gradient with hindsight experience replay
 3. Biased hindsight policy gradient
 4. Proximal Policy Optimization on GPU
+5. Covariance Matrix Adaptation Evolutionary Strategy
 
 ## In progress...
 
