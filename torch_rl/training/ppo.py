@@ -34,18 +34,33 @@ class AdvantageEstimator(object):
         self.gamma = gamma
         self.lam = lam
         self.nsteps = nsteps
-        self.state = None
+        self.state = [] if network.recurrent else None
         self.done = False
         self.global_step = 0
         self.episodes = 0
+        self.recurrent = network.recurrent
 
     def run(self):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_logpacs = [], [], [], [], [], []
-        mb_state = self.state
+        mb_states = self.state
         epinfos = []
-
         for _ in range(self.nsteps):
-            actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
+            if mb_states is None:
+                actions, values = self.network(tt(self.obs, cuda=False).view(1,-1))
+            else:
+                state_critic = self.network.lh_val
+                state_policy = self.network.lh_pol
+                actions, values = self.network(tt(self.obs, cuda=False).view(1,1,-1), use_last_state=True)
+                if state_critic is None:
+                    state_critic = np.zeros_like(self.network.lh_val.data.numpy())
+                    state_policy = np.zeros_like(self.network.lh_pol.data.numpy())
+                else:
+                    state_critic = state_critic.data.numpy()
+                    state_policy = state_policy.data.numpy()
+
+                mb_states.append([state_policy,state_critic])
+
+
             logpacs = self.network.logprob(actions)
 
             mb_obs.append(self.obs.copy().flatten())
@@ -64,7 +79,8 @@ class AdvantageEstimator(object):
                 self.episodes+=1
                 logger.logkv("episodes", self.episodes)
                 self.obs = self.env.reset()
-
+                if self.network.recurrent:
+                    self.network.reset() 
 
 
         # batch of steps to batch of rollouts
@@ -74,8 +90,14 @@ class AdvantageEstimator(object):
         mb_values = np.asarray(mb_values, dtype=np.float32).reshape(self.nsteps, -1)
         mb_logpacs = np.asarray(mb_logpacs, dtype=np.float32).reshape(self.nsteps, -1)
         mb_dones = np.asarray(mb_dones, dtype=np.bool).reshape(self.nsteps, -1)
+        if not mb_states is None:
+            #mb_states = np.asarray(mb_states, dtype=np.float32).reshape(self.nsteps, 1, -1)
+            action, last_values = self.network(tt(self.obs.reshape(1,1,-1), cuda=False), use_last_state=True)
+            mb_states = np.asarray(mb_states, dtype=np.float32)
 
-        action, last_values = self.network(tt(self.obs.reshape(1,-1), cuda=False))
+        else:
+            action, last_values = self.network(tt(self.obs.reshape(1,-1), cuda=False))
+
         action, last_values = action.data.numpy().reshape(-1), last_values.data.numpy().reshape(-1)
 
         # discount/bootstrap off value fn
@@ -94,7 +116,7 @@ class AdvantageEstimator(object):
         mb_returns = mb_advs + mb_values
 
 
-        return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_logpacs, mb_state
+        return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_logpacs, mb_states
 
         # obs, returns, masks, actions, values, neglogpacs, states = runner.run()
 
@@ -123,6 +145,7 @@ class GPUPPOTrainer(HorizonTrainer):
         self.optimizer = Adam(network.parameters(), lr=lr) if optimizer is None else optimizer
         self.goal_based = hasattr(env, "goal")
         self.network = network
+        self.recurrent = network.recurrent
         self.ent_coef = ent_coef
         self.num_threads = num_threads
         self.n_update_steps = n_update_steps
@@ -147,18 +170,27 @@ class GPUPPOTrainer(HorizonTrainer):
 
         nbatch_train = self.n_steps // self.n_minibatches
 
-        self.network.cuda()
+        
+        if tor.cuda.is_available():
+            network = self.network.cuda()
+        else:
+            network=self.network
         #self.optimizer = Adam(self.network.parameters(), lr=self.lr) 
+        if not states is None:
+            #store last network state
+            lh_val = network.lh_val
+            lh_pol = network.lh_pol
 
-        if states is None: # nonrecurrent version
-            inds = np.arange(self.n_steps)
-            for _ in range(self.n_update_steps):
-                np.random.shuffle(inds)
-                for start in range(0, self.n_steps, nbatch_train):
-                    end = start + nbatch_train
-                    mbinds = inds[start:end]
-                    bobs, breturns, bmasks, bactions, bvalues, blogpacs, badvs = map(lambda arr: arr[mbinds], (obs, returns, masks, actions, values, logpacs, advs))
+        inds = np.arange(self.n_steps)
+        for _ in range(self.n_update_steps):
+            np.random.shuffle(inds)
+            for start in range(0, self.n_steps, nbatch_train):
+                end = start + nbatch_train
+                mbinds = inds[start:end]
+                if states is None: # nonrecurrent version
 
+                    bobs, breturns, bmasks, bactions, bvalues, blogpacs, badvs = map(\
+                        lambda arr: arr[mbinds], (obs, returns, masks, actions, values, logpacs, advs))
                     # This introduces bias since the advantages can be normalized over more episodes
                     #advs = (advs - advs.mean()) / (advs.std() + 1e-8)
 
@@ -169,16 +201,15 @@ class GPUPPOTrainer(HorizonTrainer):
                     OLDLOGPAC = tt(blogpacs)
                     OLDVPRED = tt(bvalues)
 
-                    self.network(OBS)
+                    actions_new, v_pred  = self.network(OBS)
                     logpac = self.network.logprob(A)
                     entropy = tor.mean(self.network.entropy())
 
                     #### Value function loss ####
                     #print(bobs)
-                    actions_new, v_pred = self.network(tt(bobs))
                     v_pred_clipped = OLDVPRED + tor.clamp(v_pred - OLDVPRED, -self.epsilon, self.epsilon)
-                    v_loss1 = (v_pred - R)**2
-                    v_loss2 = (v_pred_clipped - R)**2
+                    v_loss1 = (v_pred - R)**2/2.
+                    v_loss2 = (v_pred_clipped - R)**2/2.
 
                     v_loss = .5 * tor.mean(tor.max(v_loss1, v_loss2))
 
@@ -201,6 +232,58 @@ class GPUPPOTrainer(HorizonTrainer):
                     loss.backward()
                     self.optimizer.step()
 
+                else:
+
+                    bobs, breturns, bmasks, bactions, bvalues, blogpacs, badvs, bstates = map(\
+                        lambda arr: arr[mbinds], (obs, returns, masks, actions, values, logpacs, advs, states))
+                    OBS = tt(bobs)
+                    A = tt(bactions)
+                    ADV = tt(badvs)
+                    R = tt(breturns)
+                    OLDLOGPAC = tt(blogpacs)
+                    OLDVPRED = tt(bvalues)
+
+                    STATES_POLICY = np.asarray([x for x,y in bstates]).squeeze().transpose((1,0,2))
+                    STATES_CRITIC = np.asarray([y for x,y in bstates]).squeeze().transpose((1,0,2))
+
+                    self.network.lh_pol = tt(STATES_POLICY)
+                    self.network.lh_val = tt(STATES_CRITIC)
+                    actions_new, v_pred  = self.network(OBS.view(nbatch_train, 1, -1), use_last_state=True)
+
+                    logpac = self.network.logprob(A)
+                    entropy = tor.mean(self.network.entropy())
+
+                    #### Value function loss ####
+                    #print(bobs)
+                    v_pred_clipped = OLDVPRED + tor.clamp(v_pred - OLDVPRED, -self.epsilon, self.epsilon)
+                    v_loss1 = (v_pred - R)**2/2.
+                    v_loss2 = (v_pred_clipped - R)**2/2.
+
+                    v_loss = .5 * tor.mean(tor.max(v_loss1, v_loss2))
+
+                    ### Ratio calculation ####
+                    # In the baselines implementation these are negative logits, then it is flipped
+                    ratio = tor.exp(logpac - OLDLOGPAC)
+
+                    ### Policy gradient calculation ###
+                    pg_loss1 = -ADV * ratio
+                    pg_loss2 = -ADV * tor.clamp(ratio, 1. - self.epsilon, 1. + self.epsilon)
+                    pg_loss = tor.mean(tor.max(pg_loss1, pg_loss2))
+                    approxkl = .5 * tor.mean((logpac - OLDLOGPAC)**2)
+
+
+                    loss = v_loss  + pg_loss + self.ent_coef*entropy
+
+                    #clipfrac = tor.mean((tor.abs(ratio - 1.0) > self.epsilon).type(tor.FloatTensor))
+
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    self.optimizer.step()
+
+        if not states is None:
+            #restore last states for runner
+            self.network.lh_pol = lh_pol
+            self.network.lh_val = lh_val
 
         #Push to CPU
         self.network.cpu()
@@ -219,25 +302,27 @@ if __name__ == '__main__':
     from torch_rl.envs.wrappers import *
     import gym
     from gym.wrappers import Monitor
-    from torch_rl.models.ppo import ActorCriticPPO
+    from torch_rl.models.ppo import ActorCriticPPO, RecurrentActorCriticPPO
     from torch_rl.utils import *
     from torch_rl.utils import logger
     from torch_rl.envs import EnvLogger
+    from torch import nn
+    import roboschool
     import sys
 
     logger.configure(clear=False)
-    monitor = Monitor(EnvLogger(NormalisedActionsWrapper(gym.make("Pendulum-v0"))), directory="./stats", force=True, 
-        video_callable=False, write_upon_reset=True)
-    env = RunningMeanStdNormalize(monitor)
+    env = EnvLogger(NormalisedActionsWrapper(gym.make("RoboschoolReacher-v1")))
+    env = RunningMeanStdNormalize(env)
     print(env.observation_space.shape)
 
 
-    with tor.cuda.device(1):
-        network = ActorCriticPPO([env.observation_space.shape[0], 64, 64, env.action_space.shape[0]])
-        network.apply(gauss_init(0, np.sqrt(2)))
+    net = RecurrentActorCriticPPO([env.observation_space.shape[0],32, env.action_space.shape[0]
+        ], recurrent_layers=2, recurr_type=nn.LSTM, bidirectional=False)
+    net.apply(gauss_init(0, np.sqrt(2)))
 
-        trainer = GPUPPO(network=network, env=env, n_update_steps=4, n_steps=40)
-        trainer.train(horizon=100000, max_episode_len=500)
+    trainer = GPUPPOTrainer(network=net, env=env, n_update_steps=10, 
+        n_steps=1024, n_minibatches=1, lmda=.95, gamma=.99, lr=3e-4, epsilon=0.2, ent_coef=0.0)
+    trainer.train(horizon=100000, max_episode_len=500)
 
 
 
